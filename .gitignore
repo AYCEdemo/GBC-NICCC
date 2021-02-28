@@ -11,6 +11,7 @@
 
 # rgbds extras
 *.sym
+*.map
 *.o
 
 # precompiled Python
