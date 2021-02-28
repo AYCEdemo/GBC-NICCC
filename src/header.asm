@@ -3,16 +3,30 @@ SECTION "RST00 Vector", ROM0[$00]
 
 SECTION "RST08 Vector", ROM0[$08]
 Fill::
-    jr _Fill
-
-SECTION "RST10 Vector", ROM0[$10]
-Copy::
-    jr _Copy
-
-SECTION "RST18 Vector", ROM0[$18]
+    dec bc
+    inc b
+    inc c
+.loop
+    ld [hl+], a
+    dec c
+    jr nz, .loop
+    dec b
+    jr nz, .loop
     ret
 
-SECTION "RST20 Vector", ROM0[$20]
+SECTION "RST18 Vector", ROM0[$18]
+Copy::
+    dec bc
+    inc b
+    inc c
+.loop
+    ld a, [hl+]
+    ld [de], a
+    inc de
+    dec c
+    jr nz, .loop
+    dec b
+    jr nz, .loop
     ret
 
 SECTION "RST28 Vector", ROM0[$28]

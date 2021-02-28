@@ -4,33 +4,7 @@ INCLUDE "src/hw.asm"
 INCLUDE "src/header.asm"
 INCLUDE "src/init.asm"
 
-SECTION "Utility Code", ROM0[$61]
-_Copy:
-    dec bc
-    inc b
-    inc c
-.loop
-    ld a, [hl+]
-    ld [de], a
-    inc de
-    dec c
-    jr nz, .loop
-    dec b
-    jr nz, .loop
-    ret
-
-_Fill:
-    dec bc
-    inc b
-    inc c
-.loop
-    ld [hl+], a
-    dec c
-    jr nz, .loop
-    dec b
-    jr nz, .loop
-    ret
-
+SECTION "Utility Code", ROM0
 LCDOff::
     ; safely turn off screen
     ld hl, rLCDC
