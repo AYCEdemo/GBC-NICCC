@@ -15,5 +15,5 @@ niccc.gbc: $(OBJS)
 	rgbfix -Cjv -m 0x1a -p 0 -r 2 -t "GBC NICCC" niccc.gbc
 
 clean:
-	rm niccc.gbc niccc.sym niccc.map
-	rm $(OBJS)
+	rm -f niccc.gbc niccc.sym niccc.map
+	rm -f $(OBJS)
