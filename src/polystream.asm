@@ -777,27 +777,24 @@ PolyStream_ReadPalette:
     ld a, [hl]
     and %01110000   ; 0GGG0000
     ld c, a
-    srl c   ; 00ggg000
-    srl c   ; 000ggg00
-    rlca    ; GGG00000
-    or c    ; GGGggg00
-    and %11111000   ; GGGgg000
-    ld c, 0 ; 00000000
-    rla     ; GGgg0000
-    rl c    ; 0000000G
-    rla     ; Ggg00000
-    rl c    ; 000000GG
+    swap a  ; 00000GGG
+    rrca    ; G00000GG
+    or c    ; Gggg00GG
+    ld c, a
+    and %11100000   ; Ggg00000
     or b    ; GggRRRrr
     ld [de], a
     inc de
     ld a, [hl+]
-    and %00000111   ; 00000bbb
+    and %00000111   ; 00000BBB
     ld b, a
     swap b  ; 0BBB0000
     rlca    ; 0000bbb0
-    or b    ; 0BBBbbb0
-    and %01111100   ; 0BBBbb00
-    or c    ; 0BBBbbGG
+    and %0001100   ; 0000bb00
+    or b    ; 0BBBbb00
+    xor c   ; GxxBbbGG  where x = B^g
+    and %11111100  ; GxxBbb00
+    xor c   ; 0BBBbbGG
     ld [de], a
     dec de
     pop bc
