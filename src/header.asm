@@ -1,5 +1,7 @@
 SECTION "RST00 Vector", ROM0[$00]
-    jp Init
+    nop
+    nop
+    jr @
 
 SECTION "RST08 Vector", ROM0[$08]
 Fill::
@@ -30,13 +32,13 @@ Copy::
     ret
 
 SECTION "RST28 Vector", ROM0[$28]
-    ret
+    jr @
 
 SECTION "RST30 Vector", ROM0[$30]
-    ret
+    jr @
 
 SECTION "RST38 Vector", ROM0[$38]
-    ret
+    jr @
 
 SECTION "VBlank IRQ Vector", ROM0[$40]
     jp VBlankInt
