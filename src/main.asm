@@ -57,10 +57,11 @@ DecodeWLELoop:
     ld b, a
     and $c0
     jr z, .literal
-    cp $40
-    jr z, .repeat
-    cp $80
-    jr z, .increment
+    ; We now know that at least 1 bit is set, so check which one is reset, if any
+    add a, a ; Bit 7 goes into carry, and only bit 6 remains, so it's essentially copied to Z
+    jr nc, .repeat ; B == $40, so carry was clear
+    jr z, .increment ; B == $80, so bit 6 was clear
+    ; B == $C0
 
 .copy
     ld a, b
