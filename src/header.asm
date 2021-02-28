@@ -43,4 +43,4 @@ SECTION "Start", ROM0[$100]
     nop
     jp Start
 
-    ds $150 - @ ; will be generated later by RGBFIX
+    ds $150 - @, 0 ; will be generated later by RGBFIX
