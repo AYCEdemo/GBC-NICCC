@@ -33,4 +33,5 @@ copycode:   MACRO
     ld de, \2
     ld bc, \1.end - \1
     rst Copy
+    ASSERT \1.end - \1 <= \2_SIZE
     ENDM

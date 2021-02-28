@@ -119,7 +119,7 @@ PolyStream_FaceLoop:
     jp z, PolyStream_DoneBank
     cp $ff ; end of frame?
     jp z, PolyStream_DonePoly
-    
+
     ; code shared with credits part
     call PolyStream_LoadVerts
     ; save polystream address
@@ -655,10 +655,9 @@ PolyStream_Fill_RAMCode:
     ldh a, [hLoopCnt]
     dec a
     jp nz, RAMCode
-    
+
     ret
 .end
-    ASSERT (PolyStream_Fill_RAMCode.end - PolyStream_Fill_RAMCode) <= $100
 
 PolyStream_Fill_Insns:
 _x = 0
