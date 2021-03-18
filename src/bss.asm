@@ -1,10 +1,15 @@
 INCLUDE "src/macros.asm"
 
 SECTION "Global Variables", WRAM0
-VBlankInt:: ds $80
-LCDInt::    ds $80
-TimerInt::  ds $80
-RAMCode::   ds $100
+buf: MACRO
+\1:: ds (\2)
+\1_SIZE equ @ - \1
+	EXPORT \1_SIZE
+ENDM
+	buf VBlankInt, $80
+	buf LCDInt,    $80
+	buf TimerInt,  $80
+	buf RAMCode,   $100
 
 ; bit 0 = running
 ; bit 1 = has callback

@@ -14,6 +14,7 @@ data/scene1_16k.bin
 
 # rgbds extras
 *.sym
+*.map
 *.o
 
 # precompiled Python
