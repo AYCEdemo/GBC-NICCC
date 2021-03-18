@@ -3,7 +3,9 @@
 all: niccc.gbc
 
 PYTHON = python
-OBJS = src/main.o src/bss.o src/polystream.o src/credits.o
+OBJS = src/main.o src/bss.o src/SoundSystem.o \
+	src/polystream.o src/credits.o \
+	data/music_main.o
 
 data/scene1_16k.bin:
 	$(PYTHON) data/repad.py

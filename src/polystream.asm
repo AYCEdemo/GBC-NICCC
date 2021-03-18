@@ -980,7 +980,12 @@ PolyStream_VBlankUpdate:
     res IF_TIMER, [hl]
     ei
 
-    ; TODO call UpdateMusic here
+    push de
+    call SoundSystem_Process
+    ; SoundSystem changes ROM bank while updating music so let's restore that back
+    ldh a, [hCurBank]
+    ld [MBC5RomBankLo], a
+    pop de
 
     pop hl
     pop bc

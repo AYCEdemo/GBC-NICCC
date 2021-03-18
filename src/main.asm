@@ -20,6 +20,15 @@ LCDOff::
 
 SECTION "Main Code", ROM0
 Main:
+    ; prepare music
+    call SoundSystem_Init
+    ld bc, BANK(Inst_chcknbnk)
+    ld de, Inst_chcknbnk
+    call Music_PrepareInst
+    ld bc, BANK(Music_chcknbnk)
+    ld de, Music_chcknbnk
+    call Music_Play
+
     call PolyStream
     jp Credits
 
