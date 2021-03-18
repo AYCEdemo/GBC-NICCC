@@ -2,6 +2,9 @@
 *.gb
 *.gbc
 
+# generated
+data/scene1_16k.bin
+
 # emulator trashes
 *.sgm
 *.sav

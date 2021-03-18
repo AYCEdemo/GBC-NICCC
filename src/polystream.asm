@@ -1052,7 +1052,7 @@ rept 40
 
 _bank = STREAM_BANK + _x
 SECTION "Polygon Stream {_x}", ROMX[$4000], BANK[_bank]
-    INCBIN "data/scene1/{d:_x}.bin"
+    INCBIN "data/scene1_16k.bin", _x * 16384, 16384
 
 _x = _x + 1
 endr

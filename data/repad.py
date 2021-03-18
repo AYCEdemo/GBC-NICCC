@@ -3,12 +3,12 @@ TARGET_BANK_SIZE = 16384
 def num(a):
     return int.from_bytes(a, "big", signed=False)
 
-def writebank(bank, data):
-    fou = open("scene1/{}.bin".format(bank), "wb")
-    fou.write(data)
-    fou.close()
+def writebank(file, data):
+    file.write(data)
+    file.write(b"\xff" * (TARGET_BANK_SIZE - len(data)))
 
-fin = open("scene1.bin", "rb")
+fin = open("data/scene1.bin", "rb")
+fou = open("data/scene1_16k.bin", "wb")
 
 bank = 0
 data = bytearray()
@@ -41,14 +41,14 @@ while running:
             if poly == 254:
                 fin.seek(((fin.tell() - 1) // 65536 + 1) * 65536)
             if len(data) + len(frame) >= TARGET_BANK_SIZE - 1:
-                writebank(bank, data[:-1] + b"\xfe")
+                writebank(fou, data[:-1] + b"\xfe")
                 bank += 1
                 data.clear()
             data += frame + b"\xff"
             frame.clear()
             if poly == 253:
                 # end
-                writebank(bank, data[:-1] + b"\xfd")
+                writebank(fou, data[:-1] + b"\xfd")
                 running = False
             break
         else:
