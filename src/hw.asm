@@ -4,6 +4,10 @@
 
 ; memory map
 VRAM_Begin  EQU $8000
+Tileset1	EQU	$8000
+Tileset2	EQU	$8800
+Map1		EQU	$9800
+Map2		EQU	$9c00
 VRAM_End    EQU $a000
 SRAM_Begin  EQU $a000
 SRAM_End    EQU $c000
@@ -30,6 +34,19 @@ IF_LCD_STAT EQU 1
 IF_TIMER    EQU 2
 IF_SERIAL   EQU 3
 IF_JOYPAD   EQU 4
+
+; LCDC flags
+LCDC_ON			EQU	1<<7 ; 0 = off, 1 = on
+LCDC_WIN9C00	EQU	1<<6 ; 0 = 9800, 1 = 9C00
+LCDC_WINON		EQU	1<<5 ; 0 = off, 1 = on
+LCDC_BG8000		EQU	1<<4 ; 0 = 8800, 1 = 8000
+LCDC_BG9C00		EQU	1<<3 ; 0 = 9800, 1 = 9C00
+LCDC_OBJSIZE	EQU 1<<2 ; 0 = 8x8, 1 = 8x16
+LCDC_OBJON		EQU	1<<1 ; 0 = off, 1 = on
+LDCD_BGPRIO		EQU	1<<0 ; 0 = off, 1 = on
+
+; LCD STAT flags
+STAT_LYC		EQU	1<<6
 
 ; OAM/BG Map attribute flags
 ATTR_PALETTE_MASK EQU %111
