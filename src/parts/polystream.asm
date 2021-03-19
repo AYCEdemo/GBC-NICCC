@@ -78,7 +78,6 @@ PolyStream::
     xor a
     ldh [rIF], a
 
-    call HHDMA_Install
     ld hl, PolyStream_HHDMACallback
     call HHDMA_SetCallback
 
@@ -979,12 +978,9 @@ PolyStream_VBlankUpdate:
     ; avoid HHDMA firing right after enabling interrupts and miss the timing
     res IF_TIMER, [hl]
     ei
-
+    
     push de
-    call SoundSystem_Process
-    ; SoundSystem changes ROM bank while updating music so let's restore that back
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
+    call UpdateMusic
     pop de
 
     pop hl

@@ -79,7 +79,6 @@ Credits::
     xor a
     ldh [rIF], a
 
-    call HHDMA_Install ; TEMP
     call HHDMA_NoCallback
     ei
 
