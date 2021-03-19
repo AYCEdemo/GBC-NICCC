@@ -63,14 +63,14 @@ NotGBA::
 .waitvblank
 	ld		hl,NotGBA_VBlankFlag
 	ld		[hl],1
+	xor		a
+	ldh		[rSCX],a
+	ldh		[rSCY],a
+	
 	halt
 	ld		a,[hl]
 	and		a
 	jr		z,.waitvblank
-	
-	xor		a
-	ldh		[rSCX],a
-	ldh		[rSCY],a
 	
 	call	SoundSystem_Process
 	
