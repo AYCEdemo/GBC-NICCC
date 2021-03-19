@@ -8,6 +8,8 @@ NotGBA_DoTech::		db
 NotGBA_FrameCount::	dw
 NotGBA_Timer::		dw
 
+NotGBA_WaitTime		equ	$2a5	; time (in frames) to wait before next screen
+
 SECTION "Not GBA Screen - Code", ROM0
 
 NotGBA::
@@ -15,9 +17,9 @@ NotGBA::
 	xor		a
 	ld		[NotGBA_FrameCount],a
 	ld		[NotGBA_FrameCount+1],a
-	ld		a,low($2a5)
+	ld		a,low(NotGBA_WaitTime)
 	ld		[NotGBA_Timer],a
-	ld		a,high($2a5)
+	ld		a,high(NotGBA_WaitTime)
 	ld		[NotGBA_Timer+1],a
 	ld		a,1
 	ld		[NotGBA_DoTech],a
@@ -115,7 +117,7 @@ NotGBA_ScreenSlide::
 	halt
 	call	SoundSystem_Process
 	ldh		a,[rWY]
-	add		3
+	add		7
 	ldh		[rWY],a
 	cp		144
 	jr		c,NotGBA_ScreenSlide
