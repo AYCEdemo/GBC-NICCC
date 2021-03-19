@@ -4,6 +4,8 @@
 
 ; memory map
 VRAM_Begin  EQU $8000
+Map1_Begin	EQU	$9800
+Map2_Begin	EQU	$9c00
 VRAM_End    EQU $a000
 SRAM_Begin  EQU $a000
 SRAM_End    EQU $c000
