@@ -3767,9 +3767,10 @@ ELSE
 SECTION	"SoundSystem Frequency Table",ROMX,BANK[SOUNDSYSTEM_CODE_BANK],ALIGN[8]
 ENDC
 
+; EDIT: B0 is changed from $03D4 so it's exactly 1920Hz
 FrequencyTable:
 	;	  C   C#/Db   D   D#/Eb   E     F   F#/Gb   G   G#/Ab   A   A#/Bb   B
-	DW	$0020,$0091,$00FC,$0160,$01C0,$0219,$026E,$02BE,$030a,$0351,$0394,$03D4	; octave 2
+	DW	$0020,$0091,$00FC,$0160,$01C0,$0219,$026E,$02BE,$030a,$0351,$0394,$03BC	; octave 2
 	DW	$0410,$0448,$047E,$04B0,$04E0,$050D,$0537,$055F,$0585,$05A8,$05Ca,$05EA	; octave 3
 	DW	$0608,$0624,$063F,$0658,$0670,$0686,$069C,$06B0,$06C2,$06D4,$06E5,$06F5	; octave 4
 	DW	$0704,$0712,$071F,$072C,$0738,$0743,$074E,$0758,$0761,$076a,$0773,$077A	; octave 5
