@@ -22,6 +22,10 @@ Credits::
     xor a
     ldh [rBGPD], a
     ldh [rBGPD], a
+	ld	a, $ff
+	ld	[rBGPD], a
+	and	$7f
+	ld	[rBGPD], a
     ldh [rVBK], a
     ; ld hl, Credits_Font
     ; ld de, wFontData

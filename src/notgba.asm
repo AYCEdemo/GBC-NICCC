@@ -111,7 +111,7 @@ NotGBA::
 	ldh		[rLCDC],a
 	ld		a,7
 	ldh		[rWX],a
-	ei
+	; fall through
 
 NotGBA_ScreenSlide::
 	halt
@@ -121,8 +121,7 @@ NotGBA_ScreenSlide::
 	ldh		[rWY],a
 	cp		144
 	jr		c,NotGBA_ScreenSlide
-	
-	; TODO
+	; fall through
 
 NotGBA_Exit::
 	ld		a,$d9		; opcode for reti
@@ -131,7 +130,6 @@ NotGBA_Exit::
 	ldh		[rLCDC],a
 	ret
 	
-; TODO: Fix garbage scanline
 LCDInt_NotGBA:
 	push	af
 	ld		a,[NotGBA_DoTech]
@@ -183,7 +181,7 @@ LCDInt_NotGBA:
 	pop		af
 	reti
 	
-SECTION "Not GBA Screen - Sine table", ROM0, ALIGN[8]
+SECTION "Not GBA Screen - Sine table", ROM0
 NotGBASine:		incbin	"data/notgba_sine.bin"
 
 SECTION "Not GBA Screen - Graphics data", ROM0
