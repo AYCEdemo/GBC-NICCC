@@ -189,7 +189,7 @@ NotGBASine:		incbin	"data/notgba_sine.bin"
 SECTION "Not GBA Screen - Graphics data", ROM0
 NotGBATiles::	incbin	"data/gfx/notgba.2bpp.wle"
 
-NotGBAMap::		incbin	"data/gfx/notgba.map"
+NotGBAMap::		incbin	"data/gfx/notgbamap.bin"
 NotGBAMap_End:
 
 NotGBAPal::		incbin	"data/gfx/notgba.pal"
