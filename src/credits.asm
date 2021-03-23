@@ -28,9 +28,9 @@ Credits::
 	ld		[rBGPD], a
 	and		$7f
 	ld		[rBGPD], a
-;	ld hl, Credits_Font
-;	ld de, Credits_TileDataDst
-;	call DecodeWLE
+	ld hl, Credits_Font
+	ld de, Credits_TileDataDst+$20
+	call DecodeWLE
 	xor 	a
 	ld		hl, Credits_TileMapDst
 	ld		bc, 32*18
@@ -576,18 +576,8 @@ CreditsText:
 	db		"triad",$ff
 	
 Credits_Font:	; TODO
-
-section "Credits - Marquee scroll table",romx,align[8]
-Credits_ScrollTable::
-    db      $00,$00,$00,$00,$00,$00,$01,$01,$02,$03,$03,$04,$05,$06,$07,$08
-    db      $09,$0A,$0C,$0D,$0F,$10,$12,$13,$15,$17,$19,$1B,$1D,$1F,$21,$23
-    db      $25,$27,$2A,$2C,$2E,$31,$33,$36,$38,$3B,$3E,$40,$43,$46,$49,$4C
-    db      $4F,$51,$54,$57,$5A,$5D,$60,$63,$67,$6A,$6D,$70,$73,$76,$79,$7C
-    db      $80,$83,$86,$89,$8C,$8F,$92,$95,$98,$9C,$9F,$A2,$A5,$A8,$AB,$AE
-    db      $B0,$B3,$B6,$B9,$BC,$BF,$C1,$C4,$C7,$C9,$CC,$CE,$D1,$D3,$D5,$D8
-    db      $DA,$DC,$DE,$E0,$E2,$E4,$E6,$E8,$EA,$EC,$ED,$EF,$F0,$F2,$F3,$F5
-    db      $F6,$F7,$F8,$F9,$FA,$FB,$FC,$FC,$FD,$FE,$FE,$FF,$FF,$FF,$FF,$FF
-
+	incbin	"data/gfx/font.2bpp.wle"
+	
 SECTION "Credits - RAM", WRAM0
 
 Credits_TextBuffer:	ds	20
