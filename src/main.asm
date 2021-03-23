@@ -29,8 +29,8 @@ Main:
     ld de, Music_chcknbnk
     call Music_Play
 
-	call NotGBA
-    call PolyStream
+;	call NotGBA
+;   call PolyStream
     jp Credits
 
 DecodeWLE::

@@ -35,3 +35,10 @@ copycode:   MACRO
     rst Copy
     ASSERT \1.end - \1 <= \2_SIZE
     ENDM
+
+waitvram:	MACRO
+.\@
+	ldh a,[rSTAT]
+	bit STAT_BUSY,a
+	jr z,.\@
+	ENDM
