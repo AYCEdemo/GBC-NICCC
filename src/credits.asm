@@ -595,7 +595,6 @@ Credits_VBlankUpdate:
 .end
 Credits_VBlankInt_SIZE EQU @-Credits_VBlankUpdate
 
-section "Credits text",rom0 ; if I don't put this in its own section i get an assert fail in an unrelated part of the code aaaaaaaaa
 CreditsText:
 	db		"PLACEHOLDER TEXT "
 	db		"       :MIAKIT_T:"
