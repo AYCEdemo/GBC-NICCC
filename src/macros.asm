@@ -37,8 +37,10 @@ copycode:   MACRO
     ENDM
 
 waitvram:	MACRO
+	push af
 .\@
 	ldh a,[rSTAT]
-	bit STAT_BUSY,a
-	jr z,.\@
+	and STAT_BUSY
+	jr nz,.\@
+	pop af
 	ENDM

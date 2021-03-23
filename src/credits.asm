@@ -29,7 +29,7 @@ Credits::
 	and		$7f
 	ld		[rBGPD], a
 	ld hl, Credits_Font
-	ld de, Credits_TileDataDst+$20
+	ld de, Credits_TileDataDst
 	call DecodeWLE
 	xor 	a
 	ld		hl, Credits_TileMapDst
@@ -38,7 +38,7 @@ Credits::
 	coord hl, 2, 1, Credits_TileMapDst
 	xor		a
 	ld		de, 32
-	ld		b, 16
+	ld		b, 15
 .settiles
 	ld		c, 16
 	push	hl
@@ -57,7 +57,7 @@ Credits::
 	ldh		[rVBK], a
 	xor		a
 	ld		hl, Credits_TileMapDst
-	ld		bc, 32*18
+	ld		bc, 32*20
 	rst		Fill
 	ld		a, 0 | ATTR_VRAM_BANK_1
 	coord	hl, 2, 2, Credits_TileMapDst
@@ -84,6 +84,13 @@ Credits::
 	xor		a
 	ldh		[rIF], a
 	
+	; set up text stuff
+	ld		hl,Credits_TextOffset
+	ld		a,low(CreditsText)
+	ld		[hl+],a
+	ld		a,high(CreditsText)
+	ld		[hl],a
+	
 	; set up interrupts
 	ld		hl,VBlankInt
 	ld		a,$c3		; opcode for jp
@@ -91,7 +98,7 @@ Credits::
 	ld		a,low(Credits_VBlankInt)
 	ld		[hl+],a
 	ld		a,high(Credits_VBlankInt)
-	ld		[hl+],a
+	ld		[hl],a
 
 	call	HHDMA_Install ; TEMP
 	call	HHDMA_NoCallback
@@ -526,62 +533,115 @@ Credits_ReadPalette:
 	jr		nz, .dummyread
 	ret
 	
-Credits_ParseText_Top:
-	ld		de,Map1
-	jr	Credits_ParseText_Loop
-Credits_ParseText_Bottom:
-	ld		de,Map1+$200
-	; fall through
-Credits_ParseText_Loop:
+Credits_DrawText::
+	; TODO
+	ld		b,b
+	push	af
+	push	bc
+	push	de
+	push	hl
+	xor		a
+	ldh		[rVBK],a
+	ld		hl,Credits_TextOffset
 	ld		a,[hl+]
+	ld		h,[hl]
+	ld		l,a
+	ld		de,Map1
+	ld		c,0
+	call	Credits_DrawString
+	ld		de,Map1+$203
+	ld		c,1
+	call	Credits_DrawString
+	ld		a,1
+	ldh		[rVBK],a
+	pop		hl
+	pop		de
+	pop		bc
+	pop		af
+	ret
+	
+Credits_DrawString::
+	ld		b,17
+	push	hl
+.loop1
+	ld		a,[hl+]
+	add		a
+	sub		64
 	waitvram
 	ld		[de],a
-	inc		de
-	and		a
-	jr		nz,Credits_ParseText_Loop
+	inc		e
+	dec		b
+	jr		nz,.loop1
+	ld		b,17
+	ld		a,e
+	add		15
+	ld		e,a
+	pop		hl
+.loop2
+	ld		a,[hl+]
+	add		a
+	sub		63
+	waitvram
+	ld		[de],a
+	inc		e
+	dec		b
+	jr		nz,.loop2
 	ret
 	
 Credits_VBlankUpdate:
 	; TODO: literally everything
+	call	Credits_DrawText
 	reti
 .end
 Credits_VBlankInt_SIZE EQU @-Credits_VBlankUpdate
 
+section "Credits text",rom0 ; if I don't put this in its own section i get an assert fail in an unrelated part of the code aaaaaaaaa
 CreditsText:
-	db		"this has been",0
-	db		"gbc-niccc",0
-	db		"first shown at",0
-	db		"revision 2021",0
-	db		"code",0
-	db		"natt",$ff
-	db		"deved",0
-	db		"gfx",0
-	db		"twoflower/triad",$ff
-	db		"natt",0
-	db		"music",0
-	db		"deved",$ff
-	db		"zlew",$ff
-	db		"natt",0
-	db		"greets",0
-	db		"oxygene",$ff
-	db		"leonard",$ff
-	db		"titan",$ff
-	db		"desire",$ff
-	db		"botb",$ff
-	db		"t lovrs comity",$ff
-	db		"dox",$ff
-	db		"dalton",$ff
-	db		"snorpung",$ff
-	db		"phantasy",$ff
-	db		"triad",$ff
+	db		"PLACEHOLDER TEXT "
+	db		"       :MIAKIT_T:"
+	db		"THIS HAS BEEN    "
+	db		"        GBC NICCC"
+	db		"FIRST SHOWN AT   "
+	db		"    REVISION 2021"
+	db		"CODE             "
+	db		"             NATT"
+	db		"CODE             "
+	db		"            DEVED"
+	db		"GFX              "
+	db		"  TWOFLOWER/TRIAD"
+	db		"GFX              "
+	db		"             NATT"
+	db		"GFX              "
+	db		"              DOC"
+	db		"MUSIC            "
+	db		"            DEVED"
+	db		"MUSIC            "
+	db		"             ZLEW"
+	db		"MUSIC            "
+	db		"             NATT"
+	db		"GREETINGS        "
+	db		"               TO"
+	db		"OXYGENE          "
+	db		"          LEONARD"
+	db		"TITAN            "
+	db		"           DESIRE"
+	db		"BOTB             "
+	db		"   T LOVRS COMITY"
+	db		"DOX              "
+	db		"           DALTON"
+	db		"SNORPUNG         "
+	db		"         PHANTASY"
+	db		"FAIRLIGHT        "
+	db		"            TRIAD"
+	db		"SCROLLER         "
+	db		"     LOOPS NOW..."
 	
-Credits_Font:	; TODO
+Credits_Font:
 	incbin	"data/gfx/font.2bpp.wle"
 	
 SECTION "Credits - RAM", WRAM0
 
 Credits_TextBuffer:	ds	20
-Credits_TextOffset:	db
 Credits_VBlankInt:	ds	Credits_VBlankInt_SIZE
-Credits_Scroll:		db
-Credits_DoScroll:	db	; bit 0 = top scroll, bit 1 = bottom scroll
+Credits_TextOffset:	dw
+Credits_ScrollTime:	db
