@@ -16,7 +16,6 @@ Credits::
 
 	di
 	copycode Credits_VBlankUpdate, Credits_VBlankInt
-	copycode Credits_LCDCUpdate, Credits_LCDInt
 	call	LCDOff
 	ld		a, $80
 	ldh		[rBGPI], a
@@ -80,7 +79,7 @@ Credits::
 	xor		a
 	ldh		[rSCX], a
 	ldh		[rSCY], a
-	ld		a, (1 << IF_LCD_STAT) | (1 << IF_VBLANK)
+	ld		a, (1 << IF_VBLANK)
 	ldh		[rIE], a
 	xor		a
 	ldh		[rIF], a
@@ -93,19 +92,6 @@ Credits::
 	ld		[hl+],a
 	ld		a,high(Credits_VBlankInt)
 	ld		[hl+],a
-	
-	ld		hl,LCDInt
-	ld		a,$c3		; opcode for jp
-	ld		[hl+],a
-	ld		a,low(Credits_LCDInt)
-	ld		[hl+],a
-	ld		a,high(Credits_LCDInt)
-	ld		[hl+],a
-
-	xor		a
-	ldh		[rLYC],a
-	ld		a,STAT_LYC
-	ldh		[rSTAT],a
 
 	call	HHDMA_Install ; TEMP
 	call	HHDMA_NoCallback
@@ -555,44 +541,8 @@ Credits_ParseText_Loop:
 	jr		nz,Credits_ParseText_Loop
 	ret
 	
-Credits_LCDCUpdate:
-	push	af
-	ldh		a,[rLY]
-	cp		127
-	jr		z,.bottomscroll
-	cp		16
-	jr		nz,.done
-	xor		a
-	ldh		[rSCX],a
-	ld		a,128	; bottom of screen - 16 pixels
-	ldh		[rLYC],a
-	jr		.done
-.bottomscroll
-	ld		a,[Credits_Scroll]
-	neg
-	ldh		[rSCX],a
-	; fall through
-.done
-	pop		af
-	reti
-.end
-Credits_LCDInt_SIZE EQU @-Credits_LCDCUpdate
-
 Credits_VBlankUpdate:
-	push	af
-	push	bc
-	push	de
-	push	hl
-	ld		a,16
-	ldh		[rLYC],a
-	ld		a,[Credits_Scroll]
-	ldh		[rSCX],a
-	inc		a
-	ld		[Credits_Scroll],a
-	pop		hl
-	pop		de
-	pop		bc
-	pop		af
+	; TODO: literally everything
 	reti
 .end
 Credits_VBlankInt_SIZE EQU @-Credits_VBlankUpdate
@@ -642,7 +592,6 @@ SECTION "Credits - RAM", WRAM0
 
 Credits_TextBuffer:	ds	20
 Credits_TextOffset:	db
-Credits_LCDInt:		ds	Credits_LCDInt_SIZE
 Credits_VBlankInt:	ds	Credits_VBlankInt_SIZE
 Credits_Scroll:		db
 Credits_DoScroll:	db	; bit 0 = top scroll, bit 1 = bottom scroll
