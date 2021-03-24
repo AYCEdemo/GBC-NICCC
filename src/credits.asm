@@ -534,12 +534,6 @@ Credits_ReadPalette:
 	ret
 	
 Credits_DrawText::
-	; TODO
-	ld		b,b
-	push	af
-	push	bc
-	push	de
-	push	hl
 	xor		a
 	ldh		[rVBK],a
 	ld		hl,Credits_TextOffset
@@ -549,39 +543,34 @@ Credits_DrawText::
 	ld		de,Map1
 	ld		c,0
 	call	Credits_DrawString
-	ld		de,Map1+$203
+	ld		de,Map1+$204
 	ld		c,1
 	call	Credits_DrawString
 	ld		a,1
 	ldh		[rVBK],a
-	pop		hl
-	pop		de
-	pop		bc
-	pop		af
 	ret
 	
+; WARNING: This is assumed to be running during VBlank!
 Credits_DrawString::
-	ld		b,17
+	ld		b,16
 	push	hl
 .loop1
 	ld		a,[hl+]
 	add		a
 	sub		64
-	waitvram
 	ld		[de],a
 	inc		e
 	dec		b
 	jr		nz,.loop1
-	ld		b,17
+	ld		b,16
 	ld		a,e
-	add		15
+	add		16
 	ld		e,a
 	pop		hl
 .loop2
 	ld		a,[hl+]
 	add		a
 	sub		63
-	waitvram
 	ld		[de],a
 	inc		e
 	dec		b
@@ -590,50 +579,71 @@ Credits_DrawString::
 	
 Credits_VBlankUpdate:
 	; TODO: literally everything
+	push	af
+	push	bc
+	push	de
+	push	hl
 	call	Credits_DrawText
+	ld		hl,CreditsTimer
+.loop
+	dec		[hl]
+	jr		nz,.skip
+	ld		hl,Credits_TextOffset
+	ld		a,[hl+]
+	ld		h,[hl]
+	ld		l,a
+	ld		de,32
+	add		hl,de
+	ld		a,h
+	ld		[Credits_TextOffset+1],a
+	ld		a,l
+	ld		[Credits_TextOffset],a
+.skip
+	pop		hl
+	pop		de
+	pop		bc
+	pop		af
 	reti
 .end
 Credits_VBlankInt_SIZE EQU @-Credits_VBlankUpdate
 
 CreditsText:
-	db		"PLACEHOLDER TEXT "
-	db		"       :MIAKIT_T:"
-	db		"THIS HAS BEEN    "
-	db		"        GBC NICCC"
-	db		"FIRST SHOWN AT   "
-	db		"    REVISION 2021"
-	db		"CODE             "
-	db		"             NATT"
-	db		"CODE             "
-	db		"            DEVED"
-	db		"GFX              "
-	db		"  TWOFLOWER/TRIAD"
-	db		"GFX              "
-	db		"             NATT"
-	db		"GFX              "
-	db		"              DOC"
-	db		"MUSIC            "
-	db		"            DEVED"
-	db		"MUSIC            "
-	db		"             ZLEW"
-	db		"MUSIC            "
-	db		"             NATT"
-	db		"GREETINGS        "
-	db		"               TO"
-	db		"OXYGENE          "
-	db		"          LEONARD"
-	db		"TITAN            "
-	db		"           DESIRE"
-	db		"BOTB             "
-	db		"   T LOVRS COMITY"
-	db		"DOX              "
-	db		"           DALTON"
-	db		"SNORPUNG         "
-	db		"         PHANTASY"
-	db		"FAIRLIGHT        "
-	db		"            TRIAD"
-	db		"SCROLLER         "
-	db		"     LOOPS NOW..."
+	db		"THIS HAS BEEN   "
+	db		"       GBC NICCC"
+	db		"FIRST SHOWN AT  "
+	db		"   REVISION 2021"
+	db		"CODE            "
+	db		"            NATT"
+	db		"CODE            "
+	db		"           DEVED"
+	db		"GFX             "
+	db		" TWOFLOWER/TRIAD"
+	db		"GFX             "
+	db		"            NATT"
+	db		"GFX             "
+	db		"             DOC"
+	db		"MUSIC           "
+	db		"           DEVED"
+	db		"MUSIC           "
+	db		"            ZLEW"
+	db		"MUSIC           "
+	db		"            NATT"
+	db		"GREETINGS       "
+	db		"           TO..."
+	db		"OXYGENE         "
+	db		"         LEONARD"
+	db		"TITAN           "
+	db		"          DESIRE"
+	db		"BOTB            "
+	db		"  T LOVRS COMITY"
+	db		"DOX             "
+	db		"          DALTON"
+	db		"SNORPUNG        "
+	db		"        PHANTASY"
+	db		"FAIRLIGHT       "
+	db		"           TRIAD"
+	db		"CREDITS         "
+	db		"         END NOW"
 	
 Credits_Font:
 	incbin	"data/gfx/font.2bpp.wle"
@@ -643,4 +653,4 @@ SECTION "Credits - RAM", WRAM0
 Credits_TextBuffer:	ds	20
 Credits_VBlankInt:	ds	Credits_VBlankInt_SIZE
 Credits_TextOffset:	dw
-Credits_ScrollTime:	db
+CreditsTimer:		db
