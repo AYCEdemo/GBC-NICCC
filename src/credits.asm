@@ -636,7 +636,7 @@ CreditsText:
 	db		"*CODE*          "
 	db		"            NATT"
 	db		"DEVED           "
-	db		"                "
+	db		"          ISSOTM"
 	db		"*GFX*           "
 	db		" TWOFLOWER/TRIAD"
 	db		"NATT            "
