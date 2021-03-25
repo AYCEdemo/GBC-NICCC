@@ -87,19 +87,12 @@ Credits::
 	xor		a
 	ldh		[rSCX], a
 	ldh		[rSCY], a
+	
+	; set up interrupts
 	ld		a, (1 << IF_VBLANK)
 	ldh		[rIE], a
 	xor		a
 	ldh		[rIF], a
-	
-	; set up text stuff
-	ld		hl,Credits_TextOffset
-	ld		a,low(CreditsText)
-	ld		[hl+],a
-	ld		a,high(CreditsText)
-	ld		[hl],a
-	
-	; set up interrupts
 	ld		hl,VBlankInt
 	ld		a,$c3		; opcode for jp
 	ld		[hl+],a
@@ -107,6 +100,8 @@ Credits::
 	ld		[hl+],a
 	ld		a,high(Credits_VBlankInt)
 	ld		[hl],a
+
+	call	Credits_ResetText
 
 	call	HHDMA_Install ; TEMP
 	call	HHDMA_NoCallback
@@ -541,6 +536,8 @@ Credits_ReadPalette:
 	jr		nz, .dummyread
 	ret
 	
+; ================
+
 Credits_DrawText::
 	xor		a
 	ldh		[rVBK],a
@@ -549,23 +546,31 @@ Credits_DrawText::
 	ld		h,[hl]
 	ld		l,a
 	ld		de,Map1
-	ld		c,0
 	call	Credits_DrawString
 	ld		de,Map1+$204
-	ld		c,1
 	call	Credits_DrawString
 	ld		a,1
 	ldh		[rVBK],a
 	ret
 	
+Credits_ResetText:
+	ld		hl,Credits_TextOffset
+	ld		a,low(CreditsText)
+	ld		[hl+],a
+	ld		a,high(CreditsText)
+	ld		[hl],a
+	ld		a,(CreditsText_End-CreditsText)/32	; computed at assembly time because magic numbers are Bad(tm)
+	ld		[Credits_LoopCounter],a
+	ret
+	
 ; WARNING: This is assumed to be running during VBlank!
 Credits_DrawString::
-	ld		b,16
+	ld		b,16	; ...he says and then uses a magic number :V
 	push	hl
 .loop1
 	ld		a,[hl+]
 	add		a
-	sub		64
+	sub		64	; top char tile offset
 	ld		[de],a
 	inc		e
 	dec		b
@@ -578,7 +583,7 @@ Credits_DrawString::
 .loop2
 	ld		a,[hl+]
 	add		a
-	sub		63
+	sub		63	; bottom char tile offset
 	ld		[de],a
 	inc		e
 	dec		b
@@ -586,16 +591,17 @@ Credits_DrawString::
 	ret
 	
 Credits_VBlankUpdate:
-	; TODO: literally everything
 	push	af
 	push	bc
 	push	de
 	push	hl
+	
 	call	Credits_DrawText
+	
 	ld		hl,CreditsTimer
-.loop
 	dec		[hl]
 	jr		nz,.skip
+	
 	ld		hl,Credits_TextOffset
 	ld		a,[hl+]
 	ld		h,[hl]
@@ -606,6 +612,9 @@ Credits_VBlankUpdate:
 	ld		[Credits_TextOffset+1],a
 	ld		a,l
 	ld		[Credits_TextOffset],a
+	ld		hl,Credits_LoopCounter
+	dec		[hl]
+	call	z,Credits_ResetText
 .skip
 	call	SoundSystem_Process
 	ldh		a, [hCurBank]
@@ -621,24 +630,20 @@ Credits_VBlankInt_SIZE EQU @-Credits_VBlankUpdate
 
 CreditsText:
 	db		"THIS HAS BEEN   "
-	db		"       GBC NICCC"
+	db		"       GBC-NICCC"
 	db		"FIRST SHOWN AT  "
 	db		"   REVISION 2021"
-	db		"CODE            "
+	db		"*CODE*          "
 	db		"            NATT"
-	db		"CODE            "
-	db		"           DEVED"
-	db		"GFX             "
+	db		"DEVED           "
+	db		"                "
+	db		"*GFX*           "
 	db		" TWOFLOWER/TRIAD"
-	db		"GFX             "
-	db		"            NATT"
-	db		"GFX             "
+	db		"NATT            "
 	db		"             DOC"
-	db		"MUSIC           "
+	db		"*MUSIC*         "
 	db		"           DEVED"
-	db		"MUSIC           "
-	db		"            ZLEW"
-	db		"MUSIC           "
+	db		"ZLEW            "
 	db		"            NATT"
 	db		"GREETINGS       "
 	db		"           TO..."
@@ -655,14 +660,15 @@ CreditsText:
 	db		"FAIRLIGHT       "
 	db		"           TRIAD"
 	db		"CREDITS         "
-	db		"         END NOW"
+	db		"        LOOP NOW"
+CreditsText_End:
 	
 Credits_Font:
 	incbin	"data/gfx/font.2bpp.wle"
 	
 SECTION "Credits - RAM", WRAM0
 
-Credits_TextBuffer:	ds	20
-Credits_VBlankInt:	ds	Credits_VBlankInt_SIZE
-Credits_TextOffset:	dw
-CreditsTimer:		db
+Credits_VBlankInt:		ds	Credits_VBlankInt_SIZE
+Credits_TextOffset:		dw
+CreditsTimer:			db
+Credits_LoopCounter:	db
