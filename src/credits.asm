@@ -8,6 +8,14 @@ Credits_TileMapDst	EQU $9800
 Y_OFFSET			EQU (128-100) / 2
 
 Credits::
+	call	SoundSystem_Init
+	ld		bc, BANK(Inst_credits)
+	ld		de, Inst_credits
+	call	Music_PrepareInst
+	ld		bc, BANK(Music_credits)
+	ld		de, Music_credits
+	call	Music_Play
+	
 	xor		a
 	ld		[wLoadPal], a
 	ld		hl, sRenderBuf
@@ -599,6 +607,10 @@ Credits_VBlankUpdate:
 	ld		a,l
 	ld		[Credits_TextOffset],a
 .skip
+	call	SoundSystem_Process
+	ldh		a, [hCurBank]
+	ld		[MBC5RomBankLo], a
+
 	pop		hl
 	pop		de
 	pop		bc
