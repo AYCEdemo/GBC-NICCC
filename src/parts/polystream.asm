@@ -294,9 +294,9 @@ PolyStream_Stroke:
     jp nc, .pixdone
     ld a, b
     and %00000111
-    add LOW(PolyStream_Pixels)
+    add LOW(OnePixelTable)
     ld l, a
-    ld h, HIGH(PolyStream_Pixels)
+    ld h, HIGH(OnePixelTable)
     ld e, [hl]
     ld l, c
     ld a, b
@@ -385,9 +385,9 @@ PolyStream_Stroke:
     ; calculate starting address and pixel
     ld a, b
     and %00000111
-    add LOW(PolyStream_Pixels)
+    add LOW(OnePixelTable)
     ld l, a
-    ld h, HIGH(PolyStream_Pixels)
+    ld h, HIGH(OnePixelTable)
     ld a, [hl]
     ldh [hFraction], a ; temp
     ld l, c
@@ -994,11 +994,6 @@ PolyStream_InfoTiles:
     db $e9, $ea, $eb, $ec, $ed, $ee, $ef, $ff
     ;        0    :    0    0    .    0    0
     db $ff, $f0, $fa, $f0, $f0, $fb, $f0, $f0
-
-PolyStream_Pixels::
-.one
-    db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
-    pagecross PolyStream_Pixels
 
 PolyStream_InfoTileData:    INCBIN "data/gfx/numbers.2bpp.wle"
 

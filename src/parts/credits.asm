@@ -449,9 +449,9 @@ Credits_Stroke:
 .loadpixtab
     ld a, b
     and %00000111
-    add LOW(PolyStream_Pixels)
+    add LOW(OnePixelTable)
     ld l, a
-    ld h, HIGH(PolyStream_Pixels)
+    ld h, HIGH(OnePixelTable)
     ret
 
 .loadbufptr

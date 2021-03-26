@@ -31,10 +31,20 @@ Main:
     ld de, Inst_chcknbnk
     call Music_PrepareInst
     ld bc, BANK(Music_chcknbnk)
-    ld de, Music_chcknbnk
+    ld de, Music_chcknbnk+4*1 ; TEMP
     call Music_Play
 
+    ; TEMP skip the music to row 16
+    ld a, 136
+.TEMP
+    push af
+    call SoundSystem_Process
+    pop af
+    dec a
+    jr nz, .TEMP
+
     ; demo parts
+    call DotPlotter_Precalc
     call DotPlotter
     call PolyStream
     jp Credits
@@ -176,3 +186,8 @@ UpdateMusic::
     ret
 
 INCLUDE "src/hyperhdma.asm"
+
+SECTION "Common Data", ROM0, ALIGN[3]
+OnePixelTable::
+    db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
+    pagecross OnePixelTable

@@ -52,3 +52,10 @@ waitmode0:  MACRO
     ; now it's at the very start of mode 0
     ENDM
 
+ldwordloop: MACRO
+    IF LOW(\2) == 0
+        ld \1, (\2)
+    ELSE
+        ld \1, ((HIGH(\2) + 1) << 8) | LOW(\2)
+    ENDC
+    ENDM
