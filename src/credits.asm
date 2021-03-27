@@ -652,7 +652,7 @@ CreditsText:
 	db		"TITAN           "
 	db		"          STROBE"
 	db		"MARQUEE DESIGN  "
-	db		"          DALTON"
+	db		"          DESIRE"
 	db		"BOTB            "
 	db		"  T LOVRS COMITY"
 	db		"DOX             "
