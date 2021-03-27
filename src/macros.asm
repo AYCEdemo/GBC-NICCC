@@ -38,17 +38,17 @@ copycode:   MACRO
 
 waitmode0:  MACRO
     ; assuming hl already points to rSTAT
-.\@0
+._\@0
     ; let the current mode 0/2 finish
     bit 0, [hl]
-    jr z, .\@0
+    jr z, ._\@0
     ; make sure this is mode 3
     bit 1, [hl]
-    jr z, .\@0
-.\@1
+    jr z, ._\@0
+._\@1
     ; wait until mode 3 finish
     bit 0, [hl]
-    jr nz, .\@1
+    jr nz, ._\@1
     ; now it's at the very start of mode 0
     ENDM
 
