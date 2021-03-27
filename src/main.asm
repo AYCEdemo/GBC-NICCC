@@ -188,6 +188,13 @@ UpdateMusic::
 INCLUDE "src/hyperhdma.asm"
 
 SECTION "Common Data", ROM0, ALIGN[8]
+SineTable::
+_x = 0.5
+    rept 256
+        db MUL(SIN(_x), 128.0) >> 16
+_x = _x + 256.0
+    endr
+
 OnePixelTable::
     rept 256/8
         db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001

@@ -10,10 +10,12 @@ DotPlotter_AttrMap      EQUS "(sRenderBuf+256*20+32*18)"
 DotPlotter_TileDataDst  EQU $8000
 DotPlotter_TileMapDst   EQU $9800
 DotPlotter_CoordTable   EQU $d000
-DotPlotter_NumDots      EQU $500
 DotPlotter_Pat1Bank     EQU 1
+DotPlotter_Pat1Dots     EQU $1000 / 3 ; = $555
 DotPlotter_Pat2Bank     EQU 2
+DotPlotter_Pat2Dots     EQU 18 ; 18*18*4 = $510
 DotPlotter_Pat3Bank     EQU 3
+DotPlotter_Pat3Dots     EQU 28 ; 36*36 = $510
 
 DotPlotter::
     call HHDMA_NoCallback
@@ -66,8 +68,12 @@ DotPlotter::
     ldh [hCurBank], a
     ld [MBC5RomBankLo], a
     ; TODO
-    ld a, DotPlotter_Pat1Bank
-    ld [rSVBK], a
+    ld a, DotPlotter_Pat3Bank
+    ldh [rSVBK], a
+    ld a, LOW(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld [wNumDots], a
+    ld a, HIGH(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld [wNumDots+1], a
 
 DotPlotter_Loop:
     ; TODO
@@ -91,7 +97,13 @@ DotPlotter_ClearBuffer:
 
 DotPlotter_PlotPixels:
     ld hl, DotPlotter_CoordTable
-    ldwordloop bc, DotPlotter_NumDots
+    ld a, [wNumDots]
+    ld c, a
+    ld a, [wNumDots+1]
+    ld b, a
+    dec bc
+    inc b
+    inc c
 .loop
     push bc
     ; the orignal demo culls dots in a cube instead of an actual view frustum
@@ -210,14 +222,14 @@ DotPlotter_Precalc::
     ; Pattern 1: Random
     ; Uses MWC PRNG
     ld a, DotPlotter_Pat1Bank
-    ld [rSVBK], a
+    ldh [rSVBK], a
     ld bc, DotPlotter_CoordTable
     ld de, $a9ce
     ld h, d
     ld l, e
-    ld a, LOW(DotPlotter_NumDots * 3 / 2)
+    ld a, LOW(DotPlotter_Pat1Dots * 3 / 2)
     ldh [hLoopCnt2], a
-    ld a, HIGH(DotPlotter_NumDots * 3 / 2) + ((DotPlotter_NumDots * 3 / 2) != 0)
+    ld a, HIGH(DotPlotter_Pat1Dots * 3 / 2) + ((DotPlotter_Pat1Dots * 3 / 2) != 0)
 .genpat1_1
     ldh [hLoopCnt], a
     ldh a, [hLoopCnt2]
@@ -261,14 +273,132 @@ DotPlotter_Precalc::
 
     ; Pattern 2: Sine plane
     ld a, DotPlotter_Pat2Bank
-    ld [rSVBK], a
+    ldh [rSVBK], a
     ; TODO
 
     ; Pattern 3: Sphere
+    ; The original demo generated this with layered circles of same dot count
+    ; Even number symmetry speeds this up to 4 dots per iteration
+    ASSERT (DotPlotter_Pat3Dots % 2) == 0
     ld a, DotPlotter_Pat3Bank
-    ld [rSVBK], a
-    ; TODO
+    ldh [rSVBK], a
+    ld hl, DotPlotter_CoordTable
+    ld de, 64 * 256 / DotPlotter_Pat3Dots / 2
+    xor a
+.genpat3_1
+    push af
+    add LOW(.pat3sizes)
+    ld c, a
+    ld a, HIGH(.pat3sizes)
+    adc 0
+    ld b, a
+    ld a, [bc]
+    ld c, a ; scale
+    ld a, d
+    ld [hLoopCnt], a
+    neg
+    ld [hLoopCnt2], a
+    push de
+
+    ld de, 65536 / DotPlotter_Pat3Dots / 2
+    ld a, DotPlotter_Pat3Dots / 2
+.genpat3_2
+    push af
+    push de
+    push hl
+    ld l, d
+    ld h, HIGH(SineTable)
+    ld e, [hl]
+    ld a, l
+    add 64 ; sin -> cos
+    ld l, a
+    ld b, [hl]
+    call .pat3mul
+    ld d, h
+    ld b, e
+    call .pat3mul
+    ld e, h
+
+    pop hl
+    ; +x +y +z
+    ld a, e
+    ld [hl+], a
+    ld a, d
+    ld [hl+], a
+    ld a, [hLoopCnt]
+    ld [hl+], a
+    ; +x +y -z
+    ld a, e
+    ld [hl+], a
+    neg
+    ld e, a
+    ld a, d
+    ld [hl+], a
+    neg
+    ld d, a
+    ld a, [hLoopCnt2]
+    ld [hl+], a
+    ; -x -y +z
+    ld a, e
+    ld [hl+], a
+    ld a, d
+    ld [hl+], a
+    ld a, [hLoopCnt]
+    ld [hl+], a
+    ; -x -y -z
+    ld a, e
+    ld [hl+], a
+    ld a, d
+    ld [hl+], a
+    ld a, [hLoopCnt2]
+    ld [hl+], a
+
+    pop de
+    ld a, e
+    add LOW(65536 / DotPlotter_Pat3Dots)
+    ld e, a
+    ld a, d
+    adc HIGH(65536 / DotPlotter_Pat3Dots)
+    ld d, a
+    pop af
+    dec a
+    jr nz, .genpat3_2
+    pop de
+    ld a, e
+    add LOW(64 * 256 / DotPlotter_Pat3Dots)
+    ld e, a
+    ld a, d
+    adc HIGH(64 * 256 / DotPlotter_Pat3Dots)
+    ld d, a
+    pop af
+    inc a
+    cp DotPlotter_Pat3Dots / 2
+    jr nz, .genpat3_1
     ret
+
+.pat3mul
+    xor a
+    ld l, a
+    ld h, a
+    bit 7, b
+    jr z, .pat3mulskip2
+    sub c
+    ld l, a
+.pat3mulskip2
+    ld a, 8
+.pat3mulloop
+    add hl, hl
+    sla b
+    jr nc, .pat3mulskip
+    add hl, bc
+.pat3mulskip
+    dec a
+    jr nz, .pat3mulloop
+    ret
+
+.pat3sizes
+    ; this could be automated but RGBDS doesn't have a square root function
+    db  67, 115, 145, 169, 188, 203, 216, 226, 235, 242, 247, 251, 254, 255
 
 DotPlotter_VBlankUpdate:
     push af
@@ -338,7 +468,7 @@ DotPlotter_UpdateCamera:
     ld a, $10 ; abss
     ldh [rJOYP], a
     rept 6
-    ld a, [rJOYP]
+    ldh a, [rJOYP]
     endr
     ld b, a
     srl b
@@ -372,12 +502,12 @@ _z = 0
     rept 64
 _x = 0
         rept 128
-            db _x * 16 / (32 + _z) + 64
+            db _x * 16 / (20 + _z * 3 / 4) + 64
 _x = _x + 1
         endr
 _x = -128
         rept 128
-            db _x * 16 / (32 + _z) + 64
+            db _x * 16 / (20 + _z * 3 / 4) + 64
 _x = _x + 1
         endr
 _z = _z + 1
@@ -386,8 +516,10 @@ _z = _z + 1
 SECTION "Dot Plotter Variables", WRAM0
 DotPlotter_ClearBegin:
 
-wCamX:  db
-wCamY:  db
-wCamZ:  db
+wNumDots:   dw
+wPat3Dots:  dw
+wCamX:      db
+wCamY:      db
+wCamZ:      db
 
 DotPlotter_ClearEnd:
