@@ -661,8 +661,8 @@ CreditsText:
 	db		"        PHANTASY"
 	db		"FAIRLIGHT       "
 	db		"           TRIAD"
-	db		"CREDITS         "
-	db		"        LOOP NOW"
+	db		"CREDITS DO      "
+	db		"    THE LOOP NOW"
 CreditsText_End:
 	
 Credits_Font:
