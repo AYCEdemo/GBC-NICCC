@@ -187,7 +187,8 @@ UpdateMusic::
 
 INCLUDE "src/hyperhdma.asm"
 
-SECTION "Common Data", ROM0, ALIGN[3]
+SECTION "Common Data", ROM0, ALIGN[8]
 OnePixelTable::
-    db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
-    pagecross OnePixelTable
+    rept 256/8
+        db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
+    endr

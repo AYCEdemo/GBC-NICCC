@@ -62,6 +62,9 @@ DotPlotter::
     ld hl, DotPlotter_HHDMACallback
     call HHDMA_SetCallback
 
+    ld a, BANK(DotPlotter_ProjTable)
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
     ; TODO
     ld a, DotPlotter_Pat1Bank
     ld [rSVBK], a
@@ -92,53 +95,48 @@ DotPlotter_PlotPixels:
 .loop
     push bc
     ; the orignal demo culls dots in a cube instead of an actual view frustum
+    ; which makes this a lot easier
+    ; z is wrapped to 0 - 63 range
     ld a, [wCamX]
     add [hl]
-    ld c, a
-    cp 160
-    jr nc, .skip1
     inc hl
+    ld c, a
     ld a, [wCamY]
     add [hl]
-    ld b, a
-    cp 128
-    jr nc, .skip2
     inc hl
+    ld b, a
     ld a, [wCamZ]
     add [hl]
-    cp 64
-    jr nc, .skip3
-    ; TODO z adjust
+    inc hl
 
     push hl
-    ld a, c
-    and %00000111
-    add LOW(OnePixelTable)
+    and $3f
+    add HIGH(DotPlotter_ProjTable)
+    ld h, a
+
+    ld l, b
+    ld e, [hl]
+    sla e ; x2
+    jr c, .skip ; out of display area
+    ; x needs a bit of re-centering to 80
+    ld l, c
+    ld a, [hl]
+    add 80 - 64
     ld l, a
     ld h, HIGH(OnePixelTable)
-    ld e, [hl]
-    ld a, b
-    add a ; x2
-    ld l, a
-    ld a, c
+    ld h, [hl] ; pixel data
     and %11111000
     rrca
     rrca
     rrca
     add HIGH(DotPlotter_Buffer)
-    ld h, a
-    ld a, [hl]
-    or e
-    ld [hl], a
-    pop hl
+    ld d, a
+    ld a, [de]
+    or h
+    ld [de], a
 
-    jr .skip3
-.skip1
-    inc hl
-.skip2
-    inc hl
-.skip3
-    inc hl
+.skip
+    pop hl
     pop bc
     dec c
     jr nz, .loop
@@ -367,6 +365,23 @@ DotPlotter_HHDMACallback:
     ld de, DotPlotter_TileDataDst
     lb bc, 16*4, 8
     jp HHDMA_Transfer
+
+SECTION "Dot Plotter Projection Table", ROMX, ALIGN[8]
+DotPlotter_ProjTable:
+_z = 0
+    rept 64
+_x = 0
+        rept 128
+            db _x * 16 / (32 + _z) + 64
+_x = _x + 1
+        endr
+_x = -128
+        rept 128
+            db _x * 16 / (32 + _z) + 64
+_x = _x + 1
+        endr
+_z = _z + 1
+    endr
 
 SECTION "Dot Plotter Variables", WRAM0
 DotPlotter_ClearBegin:
