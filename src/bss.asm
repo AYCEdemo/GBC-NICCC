@@ -4,12 +4,12 @@ SECTION "Global Variables", WRAM0
 buf: MACRO
 \1:: ds (\2)
 \1_SIZE equ @ - \1
-	EXPORT \1_SIZE
+    EXPORT \1_SIZE
 ENDM
-	buf VBlankInt, $80
-	buf LCDInt,    $80
-	buf TimerInt,  $80
-	buf RAMCode,   $100
+    buf VBlankInt, $80
+    buf LCDInt,    $80
+    buf TimerInt,  $80
+    buf RAMCode,   $100
 
 ; bit 0 = running
 ; bit 1 = has callback
@@ -18,6 +18,7 @@ HHDMA_Status::  db
 wReqVB::        db
 
 wPolyStream_ClearBegin::
+wDemoTimer::    dw
 wOddFrame::     db
 wClearBuffer::  db
 wUseVertIndex:: db

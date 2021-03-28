@@ -44,3 +44,36 @@ waitvram:	MACRO
 	jr nz,.\@
 	pop af
 	ENDM
+
+waitmode0:  MACRO
+    ; assuming hl already points to rSTAT
+._\@0
+    ; let the current mode 0/2 finish
+    bit 0, [hl]
+    jr z, ._\@0
+    ; make sure this is mode 3
+    bit 1, [hl]
+    jr z, ._\@0
+._\@1
+    ; wait until mode 3 finish
+    bit 0, [hl]
+    jr nz, ._\@1
+    ; now it's at the very start of mode 0
+    ENDM
+
+ldwordloop: MACRO
+    IF LOW(\2) == 0
+        ld \1, (\2)
+    ELSE
+        ld \1, ((HIGH(\2) + 1) << 8) | LOW(\2)
+    ENDC
+    ENDM
+
+cp16:       MACRO
+    ld a, HIGH(\1)
+    cp HIGH(\2)
+    jr nz, .nz\@
+    ld a, LOW(\1)
+    cp LOW(\2)
+.nz\@
+    ENDM

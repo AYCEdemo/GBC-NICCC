@@ -103,7 +103,6 @@ Credits::
 
 	call	Credits_ResetText
 
-	call	HHDMA_Install ; TEMP
 	call	HHDMA_NoCallback
 	ei
 
@@ -472,12 +471,12 @@ Credits_Stroke:
 	jp		Credits_FaceLoop
 
 .loadpixtab
-	ld		a, b
-	and		%00000111
-	add		LOW(PolyStream_Pixels)
-	ld		l, a
-	ld		h, HIGH(PolyStream_Pixels)
-	ret
+    ld a, b
+    and %00000111
+    add LOW(OnePixelTable)
+    ld l, a
+    ld h, HIGH(OnePixelTable)
+    ret
 
 .loadbufptr
 	ld		a, c

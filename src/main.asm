@@ -20,17 +20,33 @@ LCDOff::
 
 SECTION "Main Code", ROM0
 Main:
+    ; prepare system
+    ld a, $80 ; turn LCD on
+    ldh [rLCDC], a
+    call HHDMA_Install
+
     ; prepare music
     call SoundSystem_Init
     ld bc, BANK(Inst_chcknbnk)
     ld de, Inst_chcknbnk
     call Music_PrepareInst
     ld bc, BANK(Music_chcknbnk)
-    ld de, Music_chcknbnk
+    ld de, Music_chcknbnk+4*1 ; TEMP
     call Music_Play
 
-;	call NotGBA
-;   call PolyStream
+    ; TEMP skip the music to row 12
+    ld a, 102
+.TEMP
+    push af
+    call SoundSystem_Process
+    pop af
+    dec a
+    jr nz, .TEMP
+
+    ; demo parts
+    call DotPlotter_Precalc
+    call DotPlotter
+    call PolyStream
     jp Credits
 
 DecodeWLE::
@@ -129,4 +145,57 @@ DecodeWLELoop:
     jr nz, .copyCommon
     ret
 
+BlackPalette::
+    ld a, $80
+    ldh [rBGPI], a
+    ldh [rOBPI], a
+    ld c, LOW(rBGPD) ; a bit speedup
+    ldh a, [rLCDC]
+    add a ; bit 7 -> carry
+    ld a, 0
+    jr nc, .lcdoff
+
+    ld b, 4
+    ld hl, rSTAT
+.lcdonLoop
+    waitmode0
+    rept 16
+    ldh [c], a ; 8
+    ldh [rOBPD], a ; 12
+    endr ; = 20 * 16 = 320, sprites safe
+    dec b ; 4
+    jr nz, .lcdonLoop ; 12
+        ; = 336
+    ret
+
+.lcdoff
+    ; regular fill, no need to wait for mode 0
+    ld b, 64
+.lcdoffLoop
+    ldh [c], a
+    ldh [rOBPD], a
+    dec b
+    jr nz, .lcdoffLoop
+    ret
+
+UpdateMusic::
+    call SoundSystem_Process
+    ; SoundSystem changes ROM bank while updating music so let's restore that back
+    ldh a, [hCurBank]
+    ld [MBC5RomBankLo], a
+    ret
+
 INCLUDE "src/hyperhdma.asm"
+
+SECTION "Common Data", ROM0, ALIGN[8]
+SineTable::
+_x = 0.5
+    rept 256
+        db MUL(SIN(_x), 128.0) >> 16
+_x = _x + 256.0
+    endr
+
+OnePixelTable::
+    rept 256/8
+        db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
+    endr

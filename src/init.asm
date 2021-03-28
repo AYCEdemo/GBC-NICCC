@@ -5,6 +5,7 @@ Start:
 Init:
     di
     xor a
+    ldh [hCurBank], a
     ldh [rSVBK], a
     ld [MBC5RomBankLo], a
     ld [MBC5RomBankHi], a

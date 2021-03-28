@@ -19,14 +19,31 @@ PolyStream::
     copycode PolyStream_Fill_RAMCode, RAMCode
 
     di
+    ; This part starts with fade from white, yaay
+    call LCDOff
     copycode PolyStream_VBlankUpdate, VBlankInt
 
     ld a, $80
     ldh [rBGPI], a
+    ld c, LOW(rBGPD)
     xor a
+    ldh [c], a
+    ldh [c], a
     ldh [rBGPD], a
     ldh [rBGPD], a
     ldh [rVBK], a
+    ldh [rSVBK], a
+    dec a ; ld a, $ff
+    rept 3 _COLORS
+    ldh [c], a
+    endr
+
+    ; Clear tile $ff
+    xor a
+    ld hl, $8ff0
+    ld bc, 1 _TILES
+    rst Fill
+
     ld hl, PolyStream_InfoTileData
     ld de, PolyStream_TileDataDst + $e9 _TILES
     call DecodeWLE
@@ -78,7 +95,6 @@ PolyStream::
     xor a
     ldh [rIF], a
 
-    call HHDMA_Install
     ld hl, PolyStream_HHDMACallback
     call HHDMA_SetCallback
 
@@ -295,9 +311,9 @@ PolyStream_Stroke:
     jp nc, .pixdone
     ld a, b
     and %00000111
-    add LOW(PolyStream_Pixels)
+    add LOW(OnePixelTable)
     ld l, a
-    ld h, HIGH(PolyStream_Pixels)
+    ld h, HIGH(OnePixelTable)
     ld e, [hl]
     ld l, c
     ld a, b
@@ -386,9 +402,9 @@ PolyStream_Stroke:
     ; calculate starting address and pixel
     ld a, b
     and %00000111
-    add LOW(PolyStream_Pixels)
+    add LOW(OnePixelTable)
     ld l, a
-    ld h, HIGH(PolyStream_Pixels)
+    ld h, HIGH(OnePixelTable)
     ld a, [hl]
     ldh [hFraction], a ; temp
     ld l, c
@@ -979,12 +995,9 @@ PolyStream_VBlankUpdate:
     ; avoid HHDMA firing right after enabling interrupts and miss the timing
     res IF_TIMER, [hl]
     ei
-
+    
     push de
-    call SoundSystem_Process
-    ; SoundSystem changes ROM bank while updating music so let's restore that back
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
+    call UpdateMusic
     pop de
 
     pop hl
@@ -998,11 +1011,6 @@ PolyStream_InfoTiles:
     db $e9, $ea, $eb, $ec, $ed, $ee, $ef, $ff
     ;        0    :    0    0    .    0    0
     db $ff, $f0, $fa, $f0, $f0, $fb, $f0, $f0
-
-PolyStream_Pixels::
-.one
-    db %10000000, %01000000, %00100000, %00010000, %00001000, %00000100, %00000010, %00000001
-    pagecross PolyStream_Pixels
 
 PolyStream_InfoTileData:    INCBIN "data/gfx/numbers.2bpp.wle"
 
