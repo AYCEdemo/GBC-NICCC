@@ -36,15 +36,6 @@ copycode:   MACRO
     ASSERT \1.end - \1 <= \2_SIZE
     ENDM
 
-waitvram:	MACRO
-	push af
-.\@
-	ldh a,[rSTAT]
-	and STAT_BUSY
-	jr nz,.\@
-	pop af
-	ENDM
-
 waitmode0:  MACRO
     ; assuming hl already points to rSTAT
 ._\@0
