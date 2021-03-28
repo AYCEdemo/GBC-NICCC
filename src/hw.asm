@@ -43,7 +43,7 @@ LCDC_BG8000		EQU	1<<4 ; 0 = 8800, 1 = 8000
 LCDC_BG9C00		EQU	1<<3 ; 0 = 9800, 1 = 9C00
 LCDC_OBJSIZE	EQU 1<<2 ; 0 = 8x8, 1 = 8x16
 LCDC_OBJON		EQU	1<<1 ; 0 = off, 1 = on
-LDCD_BGPRIO		EQU	1<<0 ; 0 = off, 1 = on
+LCDC_BGPRIO		EQU	1<<0 ; 0 = off, 1 = on
 
 ; LCD STAT flags
 STAT_LYC		EQU	1<<6

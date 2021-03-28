@@ -11,6 +11,7 @@ OBJS = src/main.o src/bss.o src/SoundSystem.o \
 data/scene1_16k.bin:
 	$(PYTHON) data/repad.py
 
+src/main.asm: src/header.asm src/init.asm;
 src/parts/polystream.asm: data/scene1_16k.bin;
 %.asm: ;
 

@@ -31,20 +31,12 @@ Main:
     ld de, Inst_chcknbnk
     call Music_PrepareInst
     ld bc, BANK(Music_chcknbnk)
-    ld de, Music_chcknbnk+4*1 ; TEMP
+    ld de, Music_chcknbnk
     call Music_Play
-
-    ; TEMP skip the music to row 12
-    ld a, 102
-.TEMP
-    push af
-    call SoundSystem_Process
-    pop af
-    dec a
-    jr nz, .TEMP
 
     ; demo parts
     call DotPlotter_Precalc
+    call NotGBA
     call DotPlotter
     call PolyStream
     jp Credits
