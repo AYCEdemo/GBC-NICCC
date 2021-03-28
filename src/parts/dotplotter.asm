@@ -13,9 +13,9 @@ DotPlotter_CoordTable   EQU $d000
 DotPlotter_Pat1Bank     EQU 1
 DotPlotter_Pat1Dots     EQU $1000 / 3 ; = $555
 DotPlotter_Pat2Bank     EQU 2
-DotPlotter_Pat2Dots     EQU 18 ; 18*18*4 = $510
+DotPlotter_Pat2Dots     EQU 28 ; 28*28 = $310, matches original
 DotPlotter_Pat3Bank     EQU 3
-DotPlotter_Pat3Dots     EQU 28 ; 36*36 = $510
+DotPlotter_Pat3Dots     EQU 28 ; 28*28 = $310, matches original
 
 DotPlotter::
     call HHDMA_NoCallback
@@ -24,6 +24,12 @@ DotPlotter::
     copycode DotPlotter_VBlankUpdate, VBlankInt
     ld a, (1 << IF_VBLANK)
     ldh [rIE], a
+    ; TEMP
+    xor a
+    ld [rIF], a
+    dec a ; ld a, $ff
+    ld [wPalTab], a
+    ld [wPalTab+1], a
     ei
     call BlackPalette
     ; LCD on, win off, tile $8000, map $9800, obj off
@@ -32,9 +38,6 @@ DotPlotter::
 
     xor a
     ldh [rVBK], a
-    dec a ; ld a, $ff
-    ld [wPalTab], a ; TEMP white
-    ld [wPalTab+1], a
     ld hl, DotPlotter_TileMap
     ld de, DotPlotter_TileMapDst
     lb bc, 32*18/16, 8
@@ -68,11 +71,11 @@ DotPlotter::
     ldh [hCurBank], a
     ld [MBC5RomBankLo], a
     ; TODO
-    ld a, DotPlotter_Pat3Bank
+    ld a, DotPlotter_Pat2Bank
     ldh [rSVBK], a
-    ld a, LOW(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld a, LOW(DotPlotter_Pat2Dots * DotPlotter_Pat2Dots)
     ld [wNumDots], a
-    ld a, HIGH(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld a, HIGH(DotPlotter_Pat2Dots * DotPlotter_Pat2Dots)
     ld [wNumDots+1], a
 
 DotPlotter_Loop:
@@ -272,9 +275,120 @@ DotPlotter_Precalc::
     jr nz, .genpat1_1
 
     ; Pattern 2: Sine plane
+    ; y = sin(x) * sin(z)
+    ; 4 dots per iteration can be done due to how sine works
+    ASSERT (DotPlotter_Pat2Dots % 2) == 0
     ld a, DotPlotter_Pat2Bank
     ldh [rSVBK], a
-    ; TODO
+    ld hl, DotPlotter_CoordTable
+    ld bc, 64 * 256 / DotPlotter_Pat2Dots / 2 ; z.8
+    ld a, DotPlotter_Pat2Dots / 2
+.genpat2_1
+    push af
+    push bc
+    ld a, b
+    ld [hLoopCnt], a ; save b
+    rept 2 ; 1 turn
+    sla c
+    rla
+    endr
+    ld e, a
+    ld d, HIGH(SineTable)
+    ld a, [de]
+    ldh [hLoopCnt2], a ; save the lookup
+
+    ld de, 256 * 256 / DotPlotter_Pat2Dots / 2 ; x.8
+    ld a, DotPlotter_Pat2Dots / 2
+.genpat2_2
+    push af
+    push hl
+    ld l, d ; 1 turn
+    ld h, HIGH(SineTable)
+    ld b, [hl]
+    ldh a, [hLoopCnt2]
+    ld c, a
+
+    xor a
+    ld l, a
+    ld h, a
+    bit 7, b
+    jr z, .genpat2_3
+    sub c
+    ld l, a
+.genpat2_3
+    ld a, b
+    sra a
+    and $c0
+    add c
+    ld c, a
+    ld a, 8
+.genpat2_4
+    add hl, hl
+    sla b
+    jr nc, .genpat2_5
+    add hl, bc
+.genpat2_5
+    dec a
+    jr nz, .genpat2_4
+    ld c, h ; mul result
+
+    pop hl
+    ; +x +z = +y
+    ld a, d
+    ld [hl+], a
+    ld a, c
+    ld [hl+], a
+    ldh a, [hLoopCnt]
+    ld b, a
+    ld [hl+], a
+    ; -x -z = +y
+    ld a, d
+    neg
+    ld [hl+], a
+    ld a, c
+    ld [hl+], a
+    ld a, b
+    neg ; b = -z
+    ld b, a
+    ld [hl+], a
+    ; +x -z = -y
+    ld a, d
+    ld [hl+], a
+    ld a, c
+    neg
+    ld c, a ; c = -y
+    ld [hl+], a
+    ld a, b
+    ld [hl+], a
+    ; -x +z = -y
+    ld a, d
+    neg
+    ld [hl+], a
+    ld a, c
+    ld [hl+], a
+    ld a, b
+    neg ; +z
+    ld [hl+], a
+
+    ld a, e
+    add LOW(256 * 256 / DotPlotter_Pat2Dots)
+    ld e, a
+    ld a, d
+    adc HIGH(256 * 256 / DotPlotter_Pat2Dots)
+    ld d, a
+    pop af
+    dec a
+    jr nz, .genpat2_2
+    pop bc
+    ld a, c
+    add LOW(64 * 256 / DotPlotter_Pat2Dots)
+    ld c, a
+    ld a, b
+    adc HIGH(64 * 256 / DotPlotter_Pat2Dots)
+    ld b, a
+    pop af
+    dec a
+    jr nz, .genpat2_1
 
     ; Pattern 3: Sphere
     ; The original demo generated this with layered circles of same dot count
@@ -300,7 +414,7 @@ DotPlotter_Precalc::
     ld [hLoopCnt2], a
     push de
 
-    ld de, 65536 / DotPlotter_Pat3Dots / 2
+    ld de, 256 * 256 / DotPlotter_Pat3Dots / 2
     ld a, DotPlotter_Pat3Dots / 2
 .genpat3_2
     push af
@@ -355,10 +469,10 @@ DotPlotter_Precalc::
 
     pop de
     ld a, e
-    add LOW(65536 / DotPlotter_Pat3Dots)
+    add LOW(256 * 256 / DotPlotter_Pat3Dots)
     ld e, a
     ld a, d
-    adc HIGH(65536 / DotPlotter_Pat3Dots)
+    adc HIGH(256 * 256 / DotPlotter_Pat3Dots)
     ld d, a
     pop af
     dec a
