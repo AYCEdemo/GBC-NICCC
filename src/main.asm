@@ -24,6 +24,7 @@ Main:
     ld a, $80 ; turn LCD on
     ldh [rLCDC], a
     call HHDMA_Install
+    call LCDOff
 
     ; prepare music
     call SoundSystem_Init

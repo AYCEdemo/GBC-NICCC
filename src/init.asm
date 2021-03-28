@@ -37,7 +37,6 @@ Init:
     ld [hl], $a1
     ld a, 2
     ldh [rSVBK], a
-    ld c, [hl]
     ld [hl], $ce
     dec a
     ldh [rSVBK], a

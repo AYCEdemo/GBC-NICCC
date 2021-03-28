@@ -8,7 +8,7 @@ NotGBA_DoTech::     db
 NotGBA_FrameCount:: dw
 NotGBA_Timer::      dw
 
-NotGBA_WaitTime     equ $2a5 ; time (in frames) to wait before next screen
+NotGBA_WaitTime     EQU 17*38 ; time (in frames) to wait before next screen
 
 SECTION "Not GBA Screen - Code", ROM0
 
