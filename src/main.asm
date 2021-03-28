@@ -34,8 +34,8 @@ Main:
     ld de, Music_chcknbnk+4*1 ; TEMP
     call Music_Play
 
-    ; TEMP skip the music to row 16
-    ld a, 136
+    ; TEMP skip the music to row 12
+    ld a, 102
 .TEMP
     push af
     call SoundSystem_Process

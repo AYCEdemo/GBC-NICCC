@@ -19,14 +19,31 @@ PolyStream::
     copycode PolyStream_Fill_RAMCode, RAMCode
 
     di
+    ; This part starts with fade from white, yaay
+    call LCDOff
     copycode PolyStream_VBlankUpdate, VBlankInt
 
     ld a, $80
     ldh [rBGPI], a
+    ld c, LOW(rBGPD)
     xor a
+    ldh [c], a
+    ldh [c], a
     ldh [rBGPD], a
     ldh [rBGPD], a
     ldh [rVBK], a
+    ldh [rSVBK], a
+    dec a ; ld a, $ff
+    rept 3 _COLORS
+    ldh [c], a
+    endr
+
+    ; Clear tile $ff
+    xor a
+    ld hl, $8ff0
+    ld bc, 1 _TILES
+    rst Fill
+
     ld hl, PolyStream_InfoTileData
     ld de, PolyStream_TileDataDst + $e9 _TILES
     call DecodeWLE

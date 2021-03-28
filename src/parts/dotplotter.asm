@@ -11,21 +11,23 @@ DotPlotter_TileDataDst  EQU $8000
 DotPlotter_TileMapDst   EQU $9800
 DotPlotter_CoordTable   EQU $d000
 DotPlotter_Pat1Bank     EQU 1
-DotPlotter_Pat1Dots     EQU $1000 / 3 ; = $555
+DotPlotter_Pat1Dots     EQU $300
 DotPlotter_Pat2Bank     EQU 2
 DotPlotter_Pat2Dots     EQU 28 ; 28*28 = $310, matches original
+DotPlotter_Pat2Time     EQU 17*18
 DotPlotter_Pat3Bank     EQU 3
 DotPlotter_Pat3Dots     EQU 28 ; 28*28 = $310, matches original
+DotPlotter_Pat3Time     EQU 17*34
+DotPlotter_TotalTime    EQU 17*48
 
 DotPlotter::
     call HHDMA_NoCallback
     di
 
     copycode DotPlotter_VBlankUpdate, VBlankInt
-    ld a, (1 << IF_VBLANK)
-    ldh [rIE], a
     ; TEMP
     xor a
+    ld [rIE], a
     ld [rIF], a
     dec a ; ld a, $ff
     ld [wPalTab], a
@@ -64,22 +66,62 @@ DotPlotter::
     ldh [rWX], a
     ldh [rWY], a
 
+    ld [wDemoTimer], a
+    ld [wDemoTimer+1], a
+    ld [wOddFrame], a
+    inc a
+    ld [wAutoCam], a
+    ; Match the original demo a bit
+    ld a, $80
+    ld [wAutoCamX], a
+    ld [wAutoCamZ], a
+
     ld hl, DotPlotter_HHDMACallback
     call HHDMA_SetCallback
+    ld a, (1 << IF_VBLANK)
+    ldh [rIE], a
 
     ld a, BANK(DotPlotter_ProjTable)
     ldh [hCurBank], a
     ld [MBC5RomBankLo], a
-    ; TODO
+    ld a, DotPlotter_Pat1Bank
+    ldh [rSVBK], a
+    ld a, LOW(DotPlotter_Pat1Dots)
+    ld [wNumDots], a
+    ld a, HIGH(DotPlotter_Pat1Dots)
+    ld [wNumDots+1], a
+
+DotPlotter_Loop:
+    ld a, [wDemoTimer]
+    ld l, a
+    ld a, [wDemoTimer+1]
+    ld h, a
+    cp16 hl, DotPlotter_Pat2Time
+    jr c, .done
+
+.pat2
     ld a, DotPlotter_Pat2Bank
     ldh [rSVBK], a
     ld a, LOW(DotPlotter_Pat2Dots * DotPlotter_Pat2Dots)
     ld [wNumDots], a
     ld a, HIGH(DotPlotter_Pat2Dots * DotPlotter_Pat2Dots)
     ld [wNumDots+1], a
+    cp16 hl, DotPlotter_Pat3Time
+    jr c, .done
 
-DotPlotter_Loop:
-    ; TODO
+.pat3
+    ld a, DotPlotter_Pat3Bank
+    ldh [rSVBK], a
+    ld a, LOW(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld [wNumDots], a
+    ld a, HIGH(DotPlotter_Pat3Dots * DotPlotter_Pat3Dots)
+    ld [wNumDots+1], a
+    cp16 hl, DotPlotter_TotalTime
+    jr c, .done
+    ; Might be one frame off, but that's the next part's job
+    ret
+
+.done
     ld a, [HHDMA_Status]
     bit 0, a
     call nz, HHDMA_Wait
@@ -98,6 +140,17 @@ DotPlotter_ClearBuffer:
     dec b
     jp nz, .loop
 
+    ; Latch camera coords to reduce tearing
+    ld hl, wCamX
+    di
+    ld a, [hl+]
+    ld [wCamXL], a
+    ld a, [hl+]
+    ld [wCamYL], a
+    ld a, [hl+]
+    ld [wCamZL], a
+    ei
+
 DotPlotter_PlotPixels:
     ld hl, DotPlotter_CoordTable
     ld a, [wNumDots]
@@ -112,15 +165,15 @@ DotPlotter_PlotPixels:
     ; the orignal demo culls dots in a cube instead of an actual view frustum
     ; which makes this a lot easier
     ; z is wrapped to 0 - 63 range
-    ld a, [wCamX]
+    ld a, [wCamXL]
     add [hl]
     inc hl
     ld c, a
-    ld a, [wCamY]
+    ld a, [wCamYL]
     add [hl]
     inc hl
     ld b, a
-    ld a, [wCamZ]
+    ld a, [wCamZL]
     add [hl]
     inc hl
 
@@ -224,15 +277,18 @@ DotPlotter_Precalc::
     ; Precalc patterns
     ; Pattern 1: Random
     ; Uses MWC PRNG
+DotPlotter_Pat1GenCnt   EQU (DotPlotter_Pat1Dots * 3 + 1) / 2
+    ; I wish RGBDS has a constant function so I can just wordloopadj(x)
+    ASSERT LOW(DotPlotter_Pat1GenCnt) != 0
     ld a, DotPlotter_Pat1Bank
     ldh [rSVBK], a
     ld bc, DotPlotter_CoordTable
     ld de, $a9ce
     ld h, d
     ld l, e
-    ld a, LOW(DotPlotter_Pat1Dots * 3 / 2)
+    ld a, LOW(DotPlotter_Pat1GenCnt)
     ldh [hLoopCnt2], a
-    ld a, HIGH(DotPlotter_Pat1Dots * 3 / 2) + ((DotPlotter_Pat1Dots * 3 / 2) != 0)
+    ld a, HIGH(DotPlotter_Pat1GenCnt) + 1
 .genpat1_1
     ldh [hLoopCnt], a
     ldh a, [hLoopCnt2]
@@ -533,6 +589,15 @@ DotPlotter_VBlankUpdate:
     ; ld [wLoadPal], a
 .loadpal_done
 
+    ; Update fade state
+    ld a, [wDemoTimer]
+    inc a
+    ld [wDemoTimer], a
+    jr nz, .notimerh
+    ld a, [wDemoTimer+1]
+    inc a
+    ld [wDemoTimer+1], a
+.notimerh
     call DotPlotter_UpdateCamera
 
     ld hl, rIF
@@ -551,33 +616,36 @@ DotPlotter_VBlankUpdate:
 .end
 
 DotPlotter_UpdateCamera:
-    ASSERT (wCamY - wCamX) == 1
-    ASSERT (wCamZ - wCamY) == 1
-
     ld hl, wCamX
     ld a, $20 ; dpad
     ldh [rJOYP], a
     ldh a, [rJOYP]
     ldh a, [rJOYP]
     ld b, a
+    ld a, [wAutoCam]
     srl b
     jr c, .noright
     dec [hl]
+    xor a
 .noright
     srl b
     jr c, .noleft
     inc [hl]
+    xor a
 .noleft
     inc hl ; wCamY
     srl b
     jr c, .noup
     inc [hl]
+    xor a
 .noup
     srl b
     jr c, .nodown
     dec [hl]
+    xor a
 .nodown
 
+    ld c, a ; save wAutoCam flag
     inc hl ; wCamZ
     ld a, $10 ; abss
     ldh [rJOYP], a
@@ -585,16 +653,60 @@ DotPlotter_UpdateCamera:
     ldh a, [rJOYP]
     endr
     ld b, a
+    ld a, c
     srl b
     jr c, .noa
     inc [hl]
+    xor a
 .noa
     srl b
     jr c, .nob
     dec [hl]
+    xor a
 .nob
+    and a
+    ld [wAutoCam], a
     ld a, $30 ; done
     ldh [rJOYP], a
+    ret z ; manual cam activated
+
+    ; Update auto cam
+    ; x += 1.5, y += 0.5, z += 1.0
+    ld h, HIGH(SineTable)
+    ld a, [wOddFrame]
+    xor 1
+    ld [wOddFrame], a
+    jr z, .skipy
+
+    ld a, [wAutoCamY]
+    ld l, a
+    inc a
+    ld [wAutoCamY], a
+    ld a, [hl]
+    add a ; x2
+    ld [wCamY], a
+    or 1 ; force nz
+
+.skipy
+    ld a, [wAutoCamX]
+    ld l, a
+    jr z, .skipx
+    inc a
+.skipx
+    inc a
+    ld [wAutoCamX], a
+    ld a, [hl]
+    add a ; x2
+    ld [wCamX], a
+
+    ld a, [wAutoCamZ]
+    ld l, a
+    inc a
+    ld [wAutoCamZ], a
+    ld a, [hl]
+    sra a ; /2
+    ld [wCamZ], a
+
     ret
 
 DotPlotter_HHDMACallback:
@@ -632,8 +744,17 @@ DotPlotter_ClearBegin:
 
 wNumDots:   dw
 wPat3Dots:  dw
+wAutoCam:   db
+wAutoCamX:  db
+wAutoCamY:  db
+wAutoCamZ:  db
 wCamX:      db
 wCamY:      db
 wCamZ:      db
+ASSERT (wCamY - wCamX) == 1
+ASSERT (wCamZ - wCamY) == 1
+wCamXL:     db
+wCamYL:     db
+wCamZL:     db
 
 DotPlotter_ClearEnd:

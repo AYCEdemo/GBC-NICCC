@@ -59,3 +59,12 @@ ldwordloop: MACRO
         ld \1, ((HIGH(\2) + 1) << 8) | LOW(\2)
     ENDC
     ENDM
+
+cp16:       MACRO
+    ld a, HIGH(\1)
+    cp HIGH(\2)
+    jr nz, .nz\@
+    ld a, LOW(\1)
+    cp LOW(\2)
+.nz\@
+    ENDM
