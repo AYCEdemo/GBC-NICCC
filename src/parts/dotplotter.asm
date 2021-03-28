@@ -29,9 +29,6 @@ DotPlotter::
     xor a
     ld [rIE], a
     ld [rIF], a
-    dec a ; ld a, $ff
-    ld [wPalTab], a
-    ld [wPalTab+1], a
     ei
     call BlackPalette
     ; LCD on, win off, tile $8000, map $9800, obj off
@@ -66,6 +63,7 @@ DotPlotter::
     ldh [rWX], a
     ldh [rWY], a
 
+    ld [wLoadPal], a
     ld [wDemoTimer], a
     ld [wDemoTimer+1], a
     ld [wOddFrame], a
@@ -575,9 +573,9 @@ DotPlotter_VBlankUpdate:
     push bc
     push hl
 
-    ; ld a, [wLoadPal]
-    ; and a
-    ; jr z, .loadpal_done
+    ld a, [wLoadPal]
+    and a
+    jr z, .loadpal_done
     ld a, $82 ; pal 0 color 1
     ldh [rBGPI], a
     ld hl, wPalTab
@@ -585,19 +583,11 @@ DotPlotter_VBlankUpdate:
     ldh [rBGPD], a
     ld a, [hl]
     ldh [rBGPD], a
-    ; xor a
-    ; ld [wLoadPal], a
+    xor a
+    ld [wLoadPal], a
 .loadpal_done
 
-    ; Update fade state
-    ld a, [wDemoTimer]
-    inc a
-    ld [wDemoTimer], a
-    jr nz, .notimerh
-    ld a, [wDemoTimer+1]
-    inc a
-    ld [wDemoTimer+1], a
-.notimerh
+    call DotPlotter_UpdateTimerAndFade
     call DotPlotter_UpdateCamera
 
     ld hl, rIF
@@ -614,6 +604,75 @@ DotPlotter_VBlankUpdate:
     pop af
     reti
 .end
+
+DotPlotter_UpdateTimerAndFade:
+FADE_TIME   EQU 20
+    ld a, [wDemoTimer]
+    inc a
+    ld l, a
+    ld [wDemoTimer], a
+    ld a, [wDemoTimer+1]
+    jr nz, .noinc
+    inc a
+.noinc
+    ld h, a
+    ld [wDemoTimer+1], a
+    and a
+    jr nz, .skip1in
+    ld a, l
+    cp FADE_TIME
+    jr nc, .skip1in
+    add FADE_TIME ; skip to fade in
+    jr .dofade
+.skip1in
+    cp16 hl, DotPlotter_Pat2Time - FADE_TIME
+    ret c
+    cp16 hl, DotPlotter_Pat2Time + FADE_TIME
+    jr nc, .skip1out
+    ld a, l
+    sub LOW(DotPlotter_Pat2Time - FADE_TIME)
+    jr .dofade
+.skip1out
+    cp16 hl, DotPlotter_Pat3Time - FADE_TIME
+    ret c
+    cp16 hl, DotPlotter_Pat3Time + FADE_TIME
+    jr nc, .skip2out
+    ld a, l
+    sub LOW(DotPlotter_Pat3Time - FADE_TIME)
+    jr .dofade
+.skip2out
+    cp16 hl, DotPlotter_TotalTime - FADE_TIME
+    ret c
+    ld a, l
+    sub LOW(DotPlotter_TotalTime - FADE_TIME)
+
+.dofade
+    sub FADE_TIME
+    jr nc, .nocpl
+    cpl
+.nocpl
+    add a
+    add LOW(.colors)
+    ld l, a
+    adc HIGH(.colors)
+    sub l
+    ld h, a
+    ld a, [hl+]
+    ld [wPalTab], a
+    ld a, [hl]
+    ld [wPalTab+1], a
+    ld a, 1
+    ld [wLoadPal], a
+    ret
+
+.colors
+    dw 0, 0, 0, 0
+_x = 1
+    rept FADE_TIME - 4
+_v = _x * 31 / (FADE_TIME - 4)
+        color _v, _v, _v
+_x = _x + 1
+    endr
 
 DotPlotter_UpdateCamera:
     ld hl, wCamX
