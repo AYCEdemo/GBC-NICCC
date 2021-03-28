@@ -36,7 +36,7 @@ NotGBA::
     ld hl, NotGBAPal
     ld a, %10000000|0 ; palette index 0, auto-increment
     ldh [rBGPI], a
-    rept 2*2 ; 2 colors to write, 1 word per color
+    rept 4*2 ; 4 colors to write, 1 word per color
         ld a, [hl+]
         ldh [rBGPD], a
     endr
