@@ -995,7 +995,7 @@ PolyStream_VBlankUpdate:
     ; avoid HHDMA firing right after enabling interrupts and miss the timing
     res IF_TIMER, [hl]
     ei
-    
+
     push de
     call UpdateMusic
     pop de

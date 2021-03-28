@@ -120,6 +120,6 @@ while True:
     if size == 0x4000 and mtime != last_dump:
         read_dump()
         last_dump = mtime
-    
+
     pygame.display.flip()
     pygame.time.wait(500)

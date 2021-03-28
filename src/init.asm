@@ -27,7 +27,7 @@ Init:
     ldh a, [hIsGBC]
     cp $11
     jr nz, NotGBC
-    
+
     ld a, 1
     ldh [rKEY1], a
     stop ; switch to double speed
