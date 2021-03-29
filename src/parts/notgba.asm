@@ -3,12 +3,12 @@ INCLUDE "src/hw.asm"
 
 SECTION "Not GBA screen - RAM", WRAM0
 
-NotGBA_VBlankFlag:: db
-NotGBA_DoTech::     db
-NotGBA_FrameCount:: dw
-NotGBA_Timer::      dw
+NotGBA_VBlankFlag:  db
+NotGBA_DoTech:      db
+NotGBA_FrameCount:  dw
+NotGBA_Timer:       dw
 
-NotGBA_WaitTime     EQU 17*38 ; time (in frames) to wait before next screen
+NotGBA_WaitTime     EQU 17*38 - 48 ; time (in frames) to wait before next screen
 
 SECTION "Not GBA Screen - Code", ROM0
 
@@ -34,22 +34,39 @@ NotGBA::
     rst Copy
 
     ld hl, NotGBAPal
-    ld a, %10000000|0 ; palette index 0, auto-increment
+    ld a, $80 ; palette index 0, auto-increment
     ldh [rBGPI], a
-    rept 4*2 ; 4 colors to write, 1 word per color
+    ld c, LOW(rBGPD)
+    rept 4 _COLORS
         ld a, [hl+]
-        ldh [rBGPD], a
+        ldh [c], a
     endr
 
-    ld hl, LCDInt
-    ld a, $c3 ; opcode for jp
-    ld [hl+], a
-    ld a, low(LCDInt_NotGBA)
-    ld [hl+], a
-    ld a, high(LCDInt_NotGBA)
-    ld [hl+], a
+    copycode LCDInt_NotGBA, LCDInt
 
-    ld a, LCDC_ON|LCDC_BG9C00|LCDC_BG8000
+    xor a
+    ldh [rSCX], a
+    ld a, 129 ; just right below the graphics
+    ldh [rSCY], a
+    ld a, 7
+    ldh [rWX], a
+    ld a, LCDC_ON | LCDC_WINON | LCDC_BG9C00 | LCDC_BG8000
+    ldh [rLCDC], a
+    ld a, (1 << IF_VBLANK)
+    ldh [rIE], a
+    ei
+
+NotGBA_ScreenSlideIn:
+    halt
+    ldh a, [rWY]
+    add 6
+    ldh [rWY], a
+    call SoundSystem_Process
+    ldh a, [rWY]
+    cp 144 ; 24 frames
+    jr c, NotGBA_ScreenSlideIn
+
+    ld a, LCDC_ON | LCDC_BG9C00 | LCDC_BG8000
     ldh [rLCDC], a
     ld a, (1 << IF_VBLANK) | (1 << IF_LCD_STAT)
     ldh [rIE], a
@@ -57,9 +74,8 @@ NotGBA::
     ldh [rLYC], a
     ld a, STAT_LYC
     ldh [rSTAT], a
-    ei
 
-.loop
+NotGBA_MainLoop:
 .waitvblank
     ld hl, NotGBA_VBlankFlag
     ld [hl], 1
@@ -103,31 +119,34 @@ NotGBA::
     ld [NotGBA_Timer+1], a
     ld a, l
     ld [NotGBA_Timer], a
-    jr .loop
+    jr NotGBA_MainLoop
+
 .next
     ld a, (1 << IF_VBLANK)
     ldh [rIE], a
-    ld a, LCDC_ON|LCDC_WINON|LCDC_WIN9C00|LCDC_BG8000
+    ld a, LCDC_ON | LCDC_WINON | LCDC_WIN9C00 | LCDC_BG8000
     ldh [rLCDC], a
     ld a, 7
     ldh [rWX], a
+    xor a
+    ldh [rWY], a
     ; fall through
 
-NotGBA_ScreenSlide::
+NotGBA_ScreenSlide:
     halt
+    ld a, (3 _COLORS) | $80
+    ldh [rBGPI], a
+    xor a ; black
+    ldh [rBGPD], a
+    ldh [rBGPD], a
+    ldh a, [rWY]
+    add 6
+    ldh [rWY], a
     call SoundSystem_Process
     ldh a, [rWY]
-    add 7
-    ldh [rWY], a
-    cp 144
+    cp 144 ; 24 frames
     jr c, NotGBA_ScreenSlide
-    ; fall through
-
-NotGBA_Exit::
-    ld a, $d9 ; opcode for reti
-    ld [LCDInt], a
-    xor a
-    ldh [rLCDC], a
+    ; exit
     ret
 
 LCDInt_NotGBA:
@@ -180,14 +199,19 @@ LCDInt_NotGBA:
 .notech
     pop af
     reti
+.end
 
 SECTION "Not GBA Screen - Sine table", ROM0
 NotGBASine:     INCBIN "data/notgba_sine.bin"
 
 SECTION "Not GBA Screen - Graphics data", ROM0
-NotGBATiles::   INCBIN "data/gfx/notgba.2bpp.wle"
+NotGBATiles:    INCBIN "data/gfx/notgba.2bpp.wle"
 
-NotGBAMap::     INCBIN "data/gfx/notgbamap.bin"
+NotGBAMap:      INCBIN "data/gfx/notgbamap.bin"
 NotGBAMap_End:
 
-NotGBAPal::     INCBIN "data/gfx/notgba.pal"
+NotGBAPal:
+    color 12, 12, 25
+    color  4,  4, 12
+    color 31, 31, 31
+    color 31, 31, 31

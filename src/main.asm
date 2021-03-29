@@ -34,6 +34,7 @@ Main:
     ld bc, BANK(Music_chcknbnk)
     ld de, Music_chcknbnk
     call Music_Play
+    call SoundSystem_Process
 
     ; demo parts
     call DotPlotter_Precalc
