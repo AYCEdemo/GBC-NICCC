@@ -40,7 +40,7 @@ Main:
     call DotPlotter_Precalc
     call NotGBA
     call DotPlotter
-    call IntroScreens
+    call IntroScreen
     call PolyStream
     jp Credits
 
