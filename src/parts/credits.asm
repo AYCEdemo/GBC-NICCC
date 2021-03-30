@@ -536,6 +536,10 @@ Credits_ReadPalette:
 ; ================
 
 Credits_DrawText::
+    ; Luckily this routine is part of VBlank interrupt
+    ; so there's no need to save a bank
+    ld a, BANK(CreditsText)
+    ld [MBC5RomBankLo], a
     ld hl, Credits_TextOffset
     ld a, [hl+]
     ld h, [hl]
@@ -558,6 +562,9 @@ Credits_DrawText::
     ld hl, Credits_LoopCounter
     dec [hl]
     call z, Credits_ResetText
+    ; restore the current bank
+    ldh a, [hCurBank]
+    ld [MBC5RomBankLo], a
     ret
 
 Credits_ResetText:
@@ -624,6 +631,8 @@ Credits_VBlankUpdate:
     reti
 .end
 
+SECTION "Credits Text", ROMX
+
 CreditsText:
     db "THIS HAS BEEN   "
     db "       GBC-NICCC"
@@ -661,7 +670,6 @@ CreditsText:
     db "    THE LOOP NOW"
 CreditsText_End:
 
-SECTION "Credits Font", ROMX
 Credits_Font:
     INCBIN "data/gfx/font.1bpp.wle"
 
