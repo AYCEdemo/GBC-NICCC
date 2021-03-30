@@ -21,6 +21,8 @@ Credits::
     ld hl, sRenderBuf
     ld bc, 16*256
     rst Fill
+    inc a
+    ld [CreditsTimer], a
 
     di
     copycode Credits_VBlankUpdate, Credits_VBlankInt
@@ -33,26 +35,29 @@ Credits::
     ldh [rVBK], a
     ; not GBA screen overwrites the second color so set it to white
     ld a, $ff
-    ld [rBGPD], a
-    and $7f
-    ld [rBGPD], a
+    ldh [rBGPD], a
+    ldh [rBGPD], a
+
+    ld a, BANK(Credits_Font)
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
     ld hl, Credits_Font
-    ld de, Credits_TileDataDst
+    ld de, wStrokeTab ; reuse
     call DecodeWLE
-    xor  a
+    xor a
     ld hl, Credits_TileMapDst
     ld bc, 32*18
     rst Fill
     coord hl, 2, 1, Credits_TileMapDst
     xor a
     ld de, 32
-    ld b, 15
+    ld b, 16
 .settiles
     ld c, 16
     push hl
 .settiles2
     ld [hl+], a
-    add  16
+    add 16
     dec c
     jr nz, .settiles2
     pop hl
@@ -68,9 +73,9 @@ Credits::
     ld bc, 32*20
     rst Fill
     ld a, 0 | ATTR_VRAM_BANK_1
-    coord hl, 2, 2, Credits_TileMapDst
+    coord hl, 2, 1, Credits_TileMapDst
     ld de, 32 - 16
-    ld b, 14
+    ld b, 16
 .setattr
     ld c, 16
 .setattr2
@@ -538,68 +543,14 @@ Credits_ReadPalette:
 ; ================
 
 Credits_DrawText::
-    xor a
-    ldh [rVBK], a
     ld hl, Credits_TextOffset
     ld a, [hl+]
     ld h, [hl]
     ld l, a
-    ld de, Map1
+    ld de, sRenderBuf + 1 ; odd plane
     call Credits_DrawString
-    ld de, Map1+$204
+    ld de, sRenderBuf + 112*2 + 1
     call Credits_DrawString
-    ld a, 1
-    ldh [rVBK], a
-    ret
-
-Credits_ResetText:
-    ld hl, Credits_TextOffset
-    ld a, low(CreditsText)
-    ld [hl+], a
-    ld a, high(CreditsText)
-    ld [hl], a
-    ld a, (CreditsText_End-CreditsText)/32 ; computed at assembly time because magic numbers are Bad(tm)
-    ld [Credits_LoopCounter], a
-    ret
-
-; WARNING: This is assumed to be running during VBlank!
-Credits_DrawString::
-    ld b, 16 ; ...he says and then uses a magic number :V
-    push hl
-.loop1
-    ld a, [hl+]
-    add a
-    sub 64 ; top char tile offset
-    ld [de], a
-    inc e
-    dec b
-    jr nz, .loop1
-    ld b, 16
-    ld a, e
-    add 16
-    ld e, a
-    pop hl
-.loop2
-    ld a, [hl+]
-    add a
-    sub 63 ; bottom char tile offset
-    ld [de], a
-    inc e
-    dec b
-    jr nz, .loop2
-    ret
-
-Credits_VBlankUpdate:
-    push af
-    push bc
-    push de
-    push hl
-
-    call Credits_DrawText
-
-    ld hl, CreditsTimer
-    dec [hl]
-    jr nz, .skip
 
     ld hl, Credits_TextOffset
     ld a, [hl+]
@@ -614,10 +565,64 @@ Credits_VBlankUpdate:
     ld hl, Credits_LoopCounter
     dec [hl]
     call z, Credits_ResetText
-.skip
-    call SoundSystem_Process
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
+    ret
+
+Credits_ResetText:
+    ld hl, Credits_TextOffset
+    ld a, low(CreditsText)
+    ld [hl+], a
+    ld a, high(CreditsText)
+    ld [hl], a
+    ld a, (CreditsText_End-CreditsText)/32 ; computed at assembly time because magic numbers are Bad(tm)
+    ld [Credits_LoopCounter], a
+    ret
+
+; WARNING: This is assumed to be running during VBlank!
+Credits_DrawString::
+    ASSERT wStrokeTab % 16 == 0
+    ld b, 16 ; ...he says and then uses a magic number :V
+.loop1
+    ld a, [hl+]
+    sub " "
+    push hl
+    ld h, HIGH(wStrokeTab) >> 4 ; speedup
+    rept 4
+        add a
+        rl h
+    endr
+    ld l, a
+    push de
+    ld c, 16
+.loop2
+    ld a, [hl+]
+    ld [de], a
+    inc e
+    inc e
+    dec c
+    jr nz, .loop2
+    pop de
+    pop hl
+    inc d ; next 8 pixels
+    dec b
+    jr nz, .loop1
+    ret
+
+Credits_VBlankUpdate:
+    push af
+    push bc
+    push de
+    push hl
+
+    ld hl, rIF
+    ; avoid HHDMA firing right after enabling interrupts and miss the timing
+    res IF_TIMER, [hl]
+    ei
+
+    call UpdateMusic
+
+    ld hl, CreditsTimer
+    dec [hl]
+    call z, Credits_DrawText
 
     pop hl
     pop de
@@ -664,8 +669,9 @@ CreditsText:
     db "    THE LOOP NOW"
 CreditsText_End:
 
+SECTION "Credits Font", ROMX
 Credits_Font:
-    INCBIN "data/gfx/font.2bpp.wle"
+    INCBIN "data/gfx/font.1bpp.wle"
 
 SECTION "Credits - RAM", WRAM0
 
