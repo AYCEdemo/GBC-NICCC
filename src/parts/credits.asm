@@ -78,7 +78,10 @@ Credits::
     jr nz, .setattr
 
     call HHDMA_NoCallback
-    call Credits_ResetText
+    ld hl, Credits_TextOffset
+    ld a, LOW(CreditsText)
+    ld [hl+], a
+    ld [hl], HIGH(CreditsText)
     call Credits_DrawText
 
     ; LCD on, win off, tile $8000, map $9800, obj off
@@ -561,41 +564,33 @@ Credits_DrawText::
     ld l, a
     ld de, sRenderBuf + 1 ; odd plane
     call Credits_DrawString
+    ld de, sRenderBuf + 80*2 + 1
+    call Credits_DrawString
+    ld de, sRenderBuf + 96*2 + 1
+    call Credits_DrawString
     ld de, sRenderBuf + 112*2 + 1
     call Credits_DrawString
 
-    ld hl, Credits_TextOffset
-    ld a, [hl+]
-    ld h, [hl]
-    ld l, a
-    ld de, 32
-    add hl, de
+    cp16 hl, CreditsText.end
+    jr c, .noreset
+    ld hl, CreditsText
+.noreset
     ld a, h
     ld [Credits_TextOffset+1], a
     ld a, l
     ld [Credits_TextOffset], a
-    ld hl, Credits_LoopCounter
-    dec [hl]
-    call z, Credits_ResetText
     ; restore the current bank
     ldh a, [hCurBank]
     ld [MBC5RomBankLo], a
     ret
 
-Credits_ResetText:
-    ld hl, Credits_TextOffset
-    ld a, low(CreditsText)
-    ld [hl+], a
-    ld a, high(CreditsText)
-    ld [hl], a
-    ld a, (CreditsText_End-CreditsText)/32 ; computed at assembly time because magic numbers are Bad(tm)
-    ld [Credits_LoopCounter], a
-    ret
-
 ; WARNING: This is assumed to be running during VBlank!
 Credits_DrawString::
     ASSERT wStrokeTab % 16 == 0
-    ld b, 16 ; ...he says and then uses a magic number :V
+    ld b, 16
+    ld a, [hl]
+    and a
+    jr z, .blankline
 .loop1
     ld a, [hl+]
     sub " "
@@ -620,6 +615,24 @@ Credits_DrawString::
     inc d ; next 8 pixels
     dec b
     jr nz, .loop1
+    ret
+
+.blankline
+    push hl
+    ld h, d
+    xor a
+.loop3
+    ld l, e
+    rept 15
+        ld [hl+], a
+        inc l
+    endr
+    ld [hl], a
+    inc h ; next 8 pixels
+    dec b
+    jr nz, .loop3
+    pop hl
+    inc hl
     ret
 
 Credits_UpdateFade:
@@ -692,47 +705,77 @@ Credits_VBlankUpdate:
 Credits_Palette:
     color  0,  0,  0
     color  0, 31,  0
-    color  9, 19, 12
-    color  5, 31,  7
+    color 11, 23, 15
+    color 11, 31, 15
 
 SECTION "Credits Text", ROMX
 
 CreditsText:
-    db "THIS HAS BEEN   "
-    db "       GBC-NICCC"
-    db "FIRST SHOWN AT  "
-    db "   REVISION 2021"
-    db "*CODE*          "
-    db "            NATT"
-    db "DEVED           "
-    db "          ISSOTM"
-    db "*GFX*           "
+    db "   GBC-NICCC    "
+    db 0
+    db "ANOTHER DEMO BY "
+    db "     -AYCE-     "
+
+    db 0
+    db 0
+    db "  THE CREDITS..."
+    db 0
+
+    db "3D-MOVIE GFX    "
+    db 0
+    db "       MON / OXG"
+    db 0
+
+    db "2D-GRAPHICS     "
+    db "      DOC / AYCE"
+    db "     NATT / AYCE"
     db " TWOFLOWER/TRIAD"
-    db "NATT            "
-    db "             DOC"
-    db "*MUSIC*         "
-    db "           DEVED"
-    db "ZLEW            "
-    db "            NATT"
-    db "GREETINGS       "
-    db "           TO..."
-    db "OXYGENE         "
-    db "         LEONARD"
-    db "TITAN           "
-    db "          STROBE"
-    db "MARQUEE DESIGN  "
-    db "          DESIRE"
-    db "BOTB            "
+
+    db "DIGITAL MUSIC   "
+    db "    DEVED / AYCE"
+    db "     NATT / AYCE"
+    db "     ZLEW / AYCE"
+
+    db "CODING          "
+    db "     NATT / AYCE"
+    db "    DEVED / AYCE"
+    db "   ISSOTM / AYCE"
+
+    db "GB SOUND CODE   "
+    db 0
+    db "   S. HOCKENHULL"
+    db 0
+
+    db 0
+    db 0
+    db "   GREEETINGS..."
+    db 0
+
+    db 0
+    db "OXYGENE  LEONARD"
+    db "TITAN     STROBE"
+    db "  MARQUEE DESIGN"
+
+    db 0
+    db "BOTB  DESIRE DOX"
+    db "JOKER   SNORPUNG"
     db "  T LOVRS COMITY"
-    db "DOX             "
-    db "           JOKER"
-    db "SNORPUNG        "
+
+    db 0
+    db "DALTON DOX JOKER"
     db "        PHANTASY"
-    db "FAIRLIGHT       "
-    db "           TRIAD"
-    db "CREDITS DO      "
-    db "    THE LOOP NOW"
-CreditsText_End:
+    db "FAIRLIGHT  TRIAD"
+
+    db 0
+    db 0
+    db "  -AYCE 2021-   "
+    db 0
+
+    db 0
+    db 0
+    db "      CREDITS DO"
+    db " THE LOOP NOW..."
+.end
 
 Credits_Font:
     INCBIN "data/gfx/font.1bpp.wle"
@@ -742,4 +785,3 @@ SECTION "Credits - RAM", WRAM0
 Credits_TextOffset:     dw
 CreditsTimer:           db
 CreditsTimerLast:       db
-Credits_LoopCounter:    db
