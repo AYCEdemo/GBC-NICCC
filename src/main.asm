@@ -179,6 +179,147 @@ UpdateMusic::
     ld [MBC5RomBankLo], a
     ret
 
+; fade stuff
+; hl = packed colors source
+; de = packed colors destination
+; b = steps per update
+; c = num colors
+
+SetFadeToWhite::
+    call SetFadeCommon
+    ld a, 31
+    ld bc, wFadeTargets
+    ld de, wFadeCurrents
+    jp SetFadeCommon2
+
+SetFadeFromWhite::
+    call SetFadeCommon
+    ld a, 31
+    ld bc, wFadeCurrents
+    ld de, wFadeTargets
+    jp SetFadeCommon2
+
+SetFadeCommon:
+    ld a, e
+    ld [wFadeDestPtr], a
+    ld a, d
+    ld [wFadeDestPtr+1], a
+    ld a, c
+    ld [wFadeCount], a
+    ld a, b
+    ld [wFadeStep], a
+    ret
+
+SetFadeCommon2:
+    push af
+    push bc
+    ld b, %00011111
+    ld a, [wFadeCount]
+.unpack
+    push af
+    ld a, [hl+]     ; gggrrrrr
+    ld c, a
+    and b           ; 000rrrrr
+    ld [de], a
+    inc de
+    ld a, [hl]      ; xbbbbbgg
+    rept 3
+        sla c
+        rla
+    endr            ; bbbggggg
+    and b           ; 000ggggg
+    ld [de], a
+    inc de
+    ld a, [hl+]     ; xbbbbbgg
+    rra             ; 0xbbbbbg
+    rra             ; g0xbbbbb
+    and b           ; 000bbbbb
+    ld [de], a
+    inc de
+    pop af
+    dec a
+    jr nz, .unpack
+
+    pop hl
+    ld b, 0
+    ld a, [wFadeCount]
+    ld c, a
+    add a ; x2
+    add c ; x3
+    ld c, a
+    ld b, 0
+    pop af
+    jp Fill
+
+ProcFade::
+    ld hl, wFadeCurrents
+    ld de, wFadeTargets
+    ld a, [wFadeStep]
+    ld b, a
+    ld a, [wFadeCount]
+    ld c, a
+    add a ; x2
+    add c ; x3
+.loop
+    push af
+    ld a, [de]
+    inc de
+    ld c, a
+    ld a, [hl]
+    cp c
+    jr z, .skip
+    jr nc, .sub
+.add
+    add b
+    cp c
+    jr c, .skip
+    jr .clamp
+.sub
+    sub b
+    jr c, .clamp
+    cp c
+    jr nc, .skip
+.clamp
+    ld a, c
+.skip
+    ld [hl+], a
+    pop af
+    dec a
+    jr nz, .loop
+    ld a, [wFadeDestPtr]
+    ld e, a
+    ld a, [wFadeDestPtr+1]
+    ld d, a
+    ld a, [wFadeCount]
+    ; fall through
+
+PackFadeCurrents::
+    ld hl, wFadeCurrents
+.loop
+    push af
+    ld a, [hl+] ; 000rrrrr
+    ld c, a
+    ld a, [hl+] ; 000ggggg
+    swap a      ; gggg000g
+    rrca        ; ggggg000
+    ld b, [hl]  ; 000bbbbb
+    inc hl
+    add a       ; gggg0000
+    rl b        ; 00bbbbbg
+    add a       ; ggg00000
+    rl b        ; 0bbbbbgg
+    or c        ; gggrrrrr
+    ld [de], a
+    inc de
+    ld a, b
+    ld [de], a
+    inc de
+
+    pop af
+    dec a
+    jr nz, .loop
+    ret
+
 INCLUDE "src/hyperhdma.asm"
 
 SECTION "Common Data", ROM0, ALIGN[8]

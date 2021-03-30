@@ -18,25 +18,16 @@ Credits::
 
     xor a
     ld [wLoadPal], a
+    ld [wOddFrame], a
+    ld [CreditsTimer], a
+    ld [CreditsTimerLast], a
     ld hl, sRenderBuf
     ld bc, 16*256
     rst Fill
-    inc a
-    ld [CreditsTimer], a
 
     di
     copycode Credits_VBlankUpdate, VBlankInt
     call LCDOff
-    ld a, $80
-    ldh [rBGPI], a
-    xor a
-    ldh [rBGPD], a
-    ldh [rBGPD], a
-    ldh [rVBK], a
-    ; not GBA screen overwrites the second color so set it to white
-    ld a, $ff
-    ldh [rBGPD], a
-    ldh [rBGPD], a
 
     ld a, BANK(Credits_Font)
     ldh [hCurBank], a
@@ -86,6 +77,10 @@ Credits::
     dec b
     jr nz, .setattr
 
+    call HHDMA_NoCallback
+    call Credits_ResetText
+    call Credits_DrawText
+
     ; LCD on, win off, tile $8000, map $9800, obj off
     ld a, %10010001
     ldh [rLCDC], a
@@ -94,14 +89,10 @@ Credits::
     ldh [rSCY], a
 
     ; set up interrupts
-    ld a, (1 << IF_VBLANK)
+    ld a, 1 << IF_VBLANK
     ldh [rIE], a
     xor a
     ldh [rIF], a
-
-    call Credits_ResetText
-
-    call HHDMA_NoCallback
     ei
 
     ; Play the entire polygon stream again, with a twist!
@@ -512,6 +503,25 @@ Credits_DonePoly:
     ld de, Credits_TileDataDst
     lb bc, 0, 8 ; 256, 8
     call HHDMA_Transfer
+    ld hl, CreditsTimerLast
+    ld a, [CreditsTimer]
+    cp [hl]
+    ld [hl], a
+    jr nc, .noskip
+    ld hl, hCurBank
+    ld a, [hl]
+    add 3
+    cp STREAM_BANK + STREAM_BANKS
+    jr c, .norestart
+    sub STREAM_BANKS
+.norestart
+    ld [hl], a
+    ld [MBC5RomBankLo], a
+    pop hl
+    ld hl, $4000
+    jp Credits_Loop
+
+.noskip
     pop hl
     jp Credits_Loop
 
@@ -536,6 +546,11 @@ Credits_ReadPalette:
 ; ================
 
 Credits_DrawText::
+    ld hl, Credits_Palette
+    ld de, wPalTab
+    lb bc, 2, 4
+    call SetFadeFromWhite
+
     ; Luckily this routine is part of VBlank interrupt
     ; so there's no need to save a bank
     ld a, BANK(CreditsText)
@@ -607,11 +622,48 @@ Credits_DrawString::
     jr nz, .loop1
     ret
 
+Credits_UpdateFade:
+    ld a, [CreditsTimer]
+    cp 3
+    ret c ; wait for renderer to catch up
+    cp 3 + 8
+    jr c, .loadpal2
+    cp 256 - 8
+    ret c
+    jr nz, .loadpal2
+    ld a, [wOddFrame]
+    and a
+    jr nz, .loadpal2
+    ld hl, Credits_Palette
+    ld de, wPalTab
+    lb bc, 2, 4
+    call SetFadeToWhite
+    ld a, 1
+.loadpal2
+    ld [wLoadPal], a
+    jp ProcFade
+
 Credits_VBlankUpdate:
     push af
     push bc
     push de
     push hl
+
+    ld a, [wLoadPal]
+    and a
+    jr z, .loadpal_done
+    ld a, $80
+    ldh [rBGPI], a
+    ld hl, wPalTab
+    lb bc, 1 _PALETTES, LOW(rBGPD)
+.loadpal
+    ld a, [hl+]
+    ldh [c], a
+    dec b
+    jr nz, .loadpal
+    xor a
+    ld [wLoadPal], a
+.loadpal_done
 
     ld hl, rIF
     ; avoid HHDMA firing right after enabling interrupts and miss the timing
@@ -620,9 +672,15 @@ Credits_VBlankUpdate:
 
     call UpdateMusic
 
+    ld a, [wOddFrame]
+    xor 1
+    ld [wOddFrame], a
+    jr nz, .odd
     ld hl, CreditsTimer
-    dec [hl]
+    inc [hl]
     call z, Credits_DrawText
+.odd
+    call Credits_UpdateFade
 
     pop hl
     pop de
@@ -630,6 +688,12 @@ Credits_VBlankUpdate:
     pop af
     reti
 .end
+
+Credits_Palette:
+    color  0,  0,  0
+    color  0, 31,  0
+    color  9, 19, 12
+    color  5, 31,  7
 
 SECTION "Credits Text", ROMX
 
@@ -677,4 +741,5 @@ SECTION "Credits - RAM", WRAM0
 
 Credits_TextOffset:     dw
 CreditsTimer:           db
+CreditsTimerLast:       db
 Credits_LoopCounter:    db

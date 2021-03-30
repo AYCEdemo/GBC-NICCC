@@ -921,10 +921,10 @@ PolyStream_VBlankUpdate:
     ld a, (1 _PALETTES) | $80
     ldh [rBGPI], a
     ld hl, wPalTab
-    ld b, 2 _PALETTES
+    lb bc, 2 _PALETTES, LOW(rBGPD)
 .loadpal
     ld a, [hl+]
-    ldh [rBGPD], a
+    ldh [c], a
     dec b
     jr nz, .loadpal
     xor a
@@ -1054,7 +1054,8 @@ _x = _x + 1
 ; polygon stream data
 
 STREAM_BANK = 3
-EXPORT STREAM_BANK
+STREAM_BANKS = 40
+EXPORT STREAM_BANK, STREAM_BANKS
 
 _x = 0
 rept 40

@@ -37,6 +37,13 @@ wCurRender::    db
 wCSecFraction:: dw
 wPolyStream_ClearEnd::
 
+; only 8 palettes for now
+wFadeCurrents:: ds 8 * 4 * 3
+wFadeTargets::  ds 8 * 4 * 3
+wFadeDestPtr::  dw
+wFadeCount::    db
+wFadeStep::     db
+
 SECTION "Aligned Variables", WRAM0, ALIGN[8]
 wVertArrayX::   ds $100
 wVertArrayY::   ds $100
