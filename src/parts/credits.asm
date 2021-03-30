@@ -77,7 +77,6 @@ Credits::
     dec b
     jr nz, .setattr
 
-    call HHDMA_NoCallback
     ld hl, Credits_TextOffset
     ld a, LOW(CreditsText)
     ld [hl+], a
@@ -90,6 +89,9 @@ Credits::
     xor a
     ldh [rSCX], a
     ldh [rSCY], a
+
+    call HHDMA_Install
+    call HHDMA_NoCallback
 
     ; set up interrupts
     ld a, 1 << IF_VBLANK

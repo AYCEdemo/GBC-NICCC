@@ -95,6 +95,7 @@ PolyStream::
     xor a
     ldh [rIF], a
 
+    call HHDMA_Install
     ld hl, PolyStream_HHDMACallback
     call HHDMA_SetCallback
 

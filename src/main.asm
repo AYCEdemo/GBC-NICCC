@@ -20,10 +20,6 @@ LCDOff::
 
 SECTION "Main Code", ROM0
 Main:
-    ; prepare system
-    ld a, $80 ; turn LCD on
-    ldh [rLCDC], a
-    call HHDMA_Install
     call LCDOff
 
     ; prepare music
