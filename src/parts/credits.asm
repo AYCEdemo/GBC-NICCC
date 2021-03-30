@@ -25,7 +25,7 @@ Credits::
     ld [CreditsTimer], a
 
     di
-    copycode Credits_VBlankUpdate, Credits_VBlankInt
+    copycode Credits_VBlankUpdate, VBlankInt
     call LCDOff
     ld a, $80
     ldh [rBGPI], a
@@ -98,13 +98,6 @@ Credits::
     ldh [rIE], a
     xor a
     ldh [rIF], a
-    ld hl, VBlankInt
-    ld a, $c3 ; opcode for jp
-    ld [hl+], a
-    ld a, low(Credits_VBlankInt)
-    ld [hl+], a
-    ld a, high(Credits_VBlankInt)
-    ld [hl], a
 
     call Credits_ResetText
 
@@ -630,7 +623,6 @@ Credits_VBlankUpdate:
     pop af
     reti
 .end
-Credits_VBlankInt_SIZE  EQU @-Credits_VBlankUpdate
 
 CreditsText:
     db "THIS HAS BEEN   "
@@ -675,7 +667,6 @@ Credits_Font:
 
 SECTION "Credits - RAM", WRAM0
 
-Credits_VBlankInt:      ds Credits_VBlankInt_SIZE
 Credits_TextOffset:     dw
 CreditsTimer:           db
 Credits_LoopCounter:    db
