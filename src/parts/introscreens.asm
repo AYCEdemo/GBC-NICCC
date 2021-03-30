@@ -3,7 +3,7 @@ INCLUDE "src/hw.asm"
 
 SECTION "Intro screens - Code", ROM0
 
-IntroScreen::
+IntroScreens::
 
 GBCNICCCScreen:
     ; LCD isn't disabled so do that first
@@ -23,7 +23,6 @@ GBCNICCCScreen:
     ld      de,Tileset1
     call    DecodeWLE
     
-    ld      b,b
     ld      hl,IntroScreen_OAMBufferOdd
     ld      bc,40*4
     xor     a

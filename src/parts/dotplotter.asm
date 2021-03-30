@@ -21,7 +21,8 @@ DotPlotter_Pat3Time     EQU 17*34
 DotPlotter_TotalTime    EQU 17*48
 
 DotPlotter::
-    call HHDMA_NoCallback
+    call HHDMA_Install
+	call HHDMA_NoCallback
     di
 
     copycode DotPlotter_VBlankUpdate, VBlankInt

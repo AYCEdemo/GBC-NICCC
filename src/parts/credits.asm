@@ -18,41 +18,37 @@ Credits::
 
     xor a
     ld [wLoadPal], a
+    ld [wOddFrame], a
+    ld [CreditsTimer], a
+    ld [CreditsTimerLast], a
     ld hl, sRenderBuf
     ld bc, 16*256
     rst Fill
 
     di
-    copycode Credits_VBlankUpdate, Credits_VBlankInt
+    copycode Credits_VBlankUpdate, VBlankInt
     call LCDOff
-    ld a, $80
-    ldh [rBGPI], a
-    xor a
-    ldh [rBGPD], a
-    ldh [rBGPD], a
-    ldh [rVBK], a
-    ; not GBA screen overwrites the second color so set it to white
-    ld a, $ff
-    ld [rBGPD], a
-    and $7f
-    ld [rBGPD], a
+
+    ld a, BANK(Credits_Font)
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
     ld hl, Credits_Font
-    ld de, Credits_TileDataDst
+    ld de, wStrokeTab ; reuse
     call DecodeWLE
-    xor  a
+    xor a
     ld hl, Credits_TileMapDst
     ld bc, 32*18
     rst Fill
     coord hl, 2, 1, Credits_TileMapDst
     xor a
     ld de, 32
-    ld b, 15
+    ld b, 16
 .settiles
     ld c, 16
     push hl
 .settiles2
     ld [hl+], a
-    add  16
+    add 16
     dec c
     jr nz, .settiles2
     pop hl
@@ -68,9 +64,9 @@ Credits::
     ld bc, 32*20
     rst Fill
     ld a, 0 | ATTR_VRAM_BANK_1
-    coord hl, 2, 2, Credits_TileMapDst
+    coord hl, 2, 1, Credits_TileMapDst
     ld de, 32 - 16
-    ld b, 14
+    ld b, 16
 .setattr
     ld c, 16
 .setattr2
@@ -81,6 +77,12 @@ Credits::
     dec b
     jr nz, .setattr
 
+    ld hl, Credits_TextOffset
+    ld a, LOW(CreditsText)
+    ld [hl+], a
+    ld [hl], HIGH(CreditsText)
+    call Credits_DrawText
+
     ; LCD on, win off, tile $8000, map $9800, obj off
     ld a, %10010001
     ldh [rLCDC], a
@@ -88,22 +90,14 @@ Credits::
     ldh [rSCX], a
     ldh [rSCY], a
 
+    call HHDMA_Install
+    call HHDMA_NoCallback
+
     ; set up interrupts
-    ld a, (1 << IF_VBLANK)
+    ld a, 1 << IF_VBLANK
     ldh [rIE], a
     xor a
     ldh [rIF], a
-    ld hl, VBlankInt
-    ld a, $c3 ; opcode for jp
-    ld [hl+], a
-    ld a, low(Credits_VBlankInt)
-    ld [hl+], a
-    ld a, high(Credits_VBlankInt)
-    ld [hl], a
-
-    call Credits_ResetText
-
-    call HHDMA_NoCallback
     ei
 
     ; Play the entire polygon stream again, with a twist!
@@ -514,6 +508,25 @@ Credits_DonePoly:
     ld de, Credits_TileDataDst
     lb bc, 0, 8 ; 256, 8
     call HHDMA_Transfer
+    ld hl, CreditsTimerLast
+    ld a, [CreditsTimer]
+    cp [hl]
+    ld [hl], a
+    jr nc, .noskip
+    ld hl, hCurBank
+    ld a, [hl]
+    add 3
+    cp STREAM_BANK + STREAM_BANKS
+    jr c, .norestart
+    sub STREAM_BANKS
+.norestart
+    ld [hl], a
+    ld [MBC5RomBankLo], a
+    pop hl
+    ld hl, $4000
+    jp Credits_Loop
+
+.noskip
     pop hl
     jp Credits_Loop
 
@@ -538,56 +551,112 @@ Credits_ReadPalette:
 ; ================
 
 Credits_DrawText::
-    xor a
-    ldh [rVBK], a
+    ld hl, Credits_Palette
+    ld de, wPalTab
+    lb bc, 2, 4
+    call SetFadeFromWhite
+
+    ; Luckily this routine is part of VBlank interrupt
+    ; so there's no need to save a bank
+    ld a, BANK(CreditsText)
+    ld [MBC5RomBankLo], a
     ld hl, Credits_TextOffset
     ld a, [hl+]
     ld h, [hl]
     ld l, a
-    ld de, Map1
+    ld de, sRenderBuf + 1 ; odd plane
     call Credits_DrawString
-    ld de, Map1+$204
+    ld de, sRenderBuf + 80*2 + 1
     call Credits_DrawString
-    ld a, 1
-    ldh [rVBK], a
-    ret
+    ld de, sRenderBuf + 96*2 + 1
+    call Credits_DrawString
+    ld de, sRenderBuf + 112*2 + 1
+    call Credits_DrawString
 
-Credits_ResetText:
-    ld hl, Credits_TextOffset
-    ld a, low(CreditsText)
-    ld [hl+], a
-    ld a, high(CreditsText)
-    ld [hl], a
-    ld a, (CreditsText_End-CreditsText)/32 ; computed at assembly time because magic numbers are Bad(tm)
-    ld [Credits_LoopCounter], a
+    cp16 hl, CreditsText.end
+    jr c, .noreset
+    ld hl, CreditsText
+.noreset
+    ld a, h
+    ld [Credits_TextOffset+1], a
+    ld a, l
+    ld [Credits_TextOffset], a
+    ; restore the current bank
+    ldh a, [hCurBank]
+    ld [MBC5RomBankLo], a
     ret
 
 ; WARNING: This is assumed to be running during VBlank!
 Credits_DrawString::
-    ld b, 16 ; ...he says and then uses a magic number :V
-    push hl
+    ASSERT wStrokeTab % 16 == 0
+    ld b, 16
+    ld a, [hl]
+    and a
+    jr z, .blankline
 .loop1
     ld a, [hl+]
-    add a
-    sub 64 ; top char tile offset
-    ld [de], a
-    inc e
-    dec b
-    jr nz, .loop1
-    ld b, 16
-    ld a, e
-    add 16
-    ld e, a
-    pop hl
+    sub " "
+    push hl
+    ld h, HIGH(wStrokeTab) >> 4 ; speedup
+    rept 4
+        add a
+        rl h
+    endr
+    ld l, a
+    push de
+    ld c, 16
 .loop2
     ld a, [hl+]
-    add a
-    sub 63 ; bottom char tile offset
     ld [de], a
     inc e
-    dec b
+    inc e
+    dec c
     jr nz, .loop2
+    pop de
+    pop hl
+    inc d ; next 8 pixels
+    dec b
+    jr nz, .loop1
     ret
+
+.blankline
+    push hl
+    ld h, d
+    xor a
+.loop3
+    ld l, e
+    rept 15
+        ld [hl+], a
+        inc l
+    endr
+    ld [hl], a
+    inc h ; next 8 pixels
+    dec b
+    jr nz, .loop3
+    pop hl
+    inc hl
+    ret
+
+Credits_UpdateFade:
+    ld a, [CreditsTimer]
+    cp 3
+    ret c ; wait for renderer to catch up
+    cp 3 + 8
+    jr c, .loadpal2
+    cp 256 - 8
+    ret c
+    jr nz, .loadpal2
+    ld a, [wOddFrame]
+    and a
+    jr nz, .loadpal2
+    ld hl, Credits_Palette
+    ld de, wPalTab
+    lb bc, 2, 4
+    call SetFadeToWhite
+    ld a, 1
+.loadpal2
+    ld [wLoadPal], a
+    jp ProcFade
 
 Credits_VBlankUpdate:
     push af
@@ -595,29 +664,38 @@ Credits_VBlankUpdate:
     push de
     push hl
 
-    call Credits_DrawText
-
-    ld hl, CreditsTimer
-    dec [hl]
-    jr nz, .skip
-
-    ld hl, Credits_TextOffset
+    ld a, [wLoadPal]
+    and a
+    jr z, .loadpal_done
+    ld a, $80
+    ldh [rBGPI], a
+    ld hl, wPalTab
+    lb bc, 1 _PALETTES, LOW(rBGPD)
+.loadpal
     ld a, [hl+]
-    ld h, [hl]
-    ld l, a
-    ld de, 32
-    add hl, de
-    ld a, h
-    ld [Credits_TextOffset+1], a
-    ld a, l
-    ld [Credits_TextOffset], a
-    ld hl, Credits_LoopCounter
-    dec [hl]
-    call z, Credits_ResetText
-.skip
-    call SoundSystem_Process
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
+    ldh [c], a
+    dec b
+    jr nz, .loadpal
+    xor a
+    ld [wLoadPal], a
+.loadpal_done
+
+    ld hl, rIF
+    ; avoid HHDMA firing right after enabling interrupts and miss the timing
+    res IF_TIMER, [hl]
+    ei
+
+    call UpdateMusic
+
+    ld a, [wOddFrame]
+    xor 1
+    ld [wOddFrame], a
+    jr nz, .odd
+    ld hl, CreditsTimer
+    inc [hl]
+    call z, Credits_DrawText
+.odd
+    call Credits_UpdateFade
 
     pop hl
     pop de
@@ -625,51 +703,87 @@ Credits_VBlankUpdate:
     pop af
     reti
 .end
-Credits_VBlankInt_SIZE  EQU @-Credits_VBlankUpdate
+
+Credits_Palette:
+    color  0,  0,  0
+    color  0, 31,  0
+    color 11, 23, 15
+    color 11, 31, 15
+
+SECTION "Credits Text", ROMX
 
 CreditsText:
-    db "THIS HAS BEEN   "
-    db "       GBC-NICCC"
-    db "FIRST SHOWN AT  "
-    db "   REVISION 2021"
-    db "*CODE*          "
-    db "            NATT"
-    db "DEVED           "
-    db "          ISSOTM"
-    db "*GFX*           "
+    db "   GBC-NICCC    "
+    db 0
+    db "ANOTHER DEMO BY "
+    db "     -AYCE-     "
+
+    db 0
+    db 0
+    db "  THE CREDITS..."
+    db 0
+
+    db "3D-MOVIE GFX    "
+    db 0
+    db "       MON / OXG"
+    db 0
+
+    db "2D-GRAPHICS     "
+    db "      DOC / AYCE"
+    db "     NATT / AYCE"
     db " TWOFLOWER/TRIAD"
-    db "NATT            "
-    db "             DOC"
-    db "*MUSIC*         "
-    db "           DEVED"
-    db "ZLEW            "
-    db "            NATT"
-    db "GREETINGS       "
-    db "           TO..."
-    db "OXYGENE         "
-    db "         LEONARD"
-    db "TITAN           "
-    db "          STROBE"
-    db "MARQUEE DESIGN  "
-    db "          DESIRE"
-    db "BOTB            "
+
+    db "DIGITAL MUSIC   "
+    db "    DEVED / AYCE"
+    db "     NATT / AYCE"
+    db "     ZLEW / AYCE"
+
+    db "CODING          "
+    db "     NATT / AYCE"
+    db "    DEVED / AYCE"
+    db "   ISSOTM / AYCE"
+
+    db "GB SOUND CODE   "
+    db 0
+    db "   S. HOCKENHULL"
+    db 0
+
+    db 0
+    db 0
+    db "   GREEETINGS..."
+    db 0
+
+    db 0
+    db "OXYGENE  LEONARD"
+    db "TITAN     STROBE"
+    db "  MARQUEE DESIGN"
+
+    db 0
+    db "BOTB  DESIRE DOX"
+    db "JOKER   SNORPUNG"
     db "  T LOVRS COMITY"
-    db "DOX             "
-    db "           JOKER"
-    db "SNORPUNG        "
+
+    db 0
+    db "DALTON DOX JOKER"
     db "        PHANTASY"
-    db "FAIRLIGHT       "
-    db "           TRIAD"
-    db "CREDITS DO      "
-    db "    THE LOOP NOW"
-CreditsText_End:
+    db "FAIRLIGHT  TRIAD"
+
+    db 0
+    db 0
+    db "  -AYCE 2021-   "
+    db 0
+
+    db 0
+    db 0
+    db "      CREDITS DO"
+    db " THE LOOP NOW..."
+.end
 
 Credits_Font:
-    INCBIN "data/gfx/font.2bpp.wle"
+    INCBIN "data/gfx/font.1bpp.wle"
 
 SECTION "Credits - RAM", WRAM0
 
-Credits_VBlankInt:      ds Credits_VBlankInt_SIZE
 Credits_TextOffset:     dw
 CreditsTimer:           db
-Credits_LoopCounter:    db
+CreditsTimerLast:       db
