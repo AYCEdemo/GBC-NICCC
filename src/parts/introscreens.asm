@@ -77,7 +77,6 @@ GBCNICCCScreen_MainLoop:
     ld      hl,IntroScreen_Timer
     dec     [hl]
 	push	af
-	ld		b,b
 	ld		a,[hl]
 	cp		20
     ld 		hl,GBCNICCCPal
@@ -139,22 +138,18 @@ AYCEScreen:
     ld      a,high(OAMDMA)
     ld      [hl],a
     
-    ld      hl,AYCE_BGPal
-    ld      a,%10000000 | 0 ; palette index 0, auto-increment
-    ldh     [rBGPI],a
-    ld      c,LOW(rBGPD)
-    rept (4 _COLORS) * 4 ; 4 palettes to load
-        ld      a,[hl+]
-        ldh     [c],a
-    endr
+	ld 		hl,AYCE_BGPal
+    ld 		de,wPalTab
+    lb 		bc,2,(4 _COLORS) * 4
+    call 	SetFadeFromBlack
    
-	ld      hl,AYCE_OBJPal
-    ld      a,%10000000 | 0 ; palette index 0, auto-increment
-    ldh     [rOBPI],a
-    ld      c,LOW(rOBPD)
-    rept (4 _COLORS) * 2 ; 2 palettes to load
-        ld      a,[hl+]
-        ldh     [c],a
+     ld      hl,AYCE_OBJPal
+     ld      a,%10000000 | 0 ; palette index 0, auto-increment
+     ldh     [rOBPI],a
+     ld      c,LOW(rOBPD)
+     rept (4 _COLORS) * 2 ; 2 palettes to load
+         ld      a,[hl+]
+         ldh     [c],a
     endr
 
     xor     a
@@ -173,7 +168,13 @@ AYCEScreen_MainLoop:
     halt
     ld      hl,IntroScreen_Timer
     dec     [hl]
-    push    af
+	push	af
+	ld		a,[hl]
+	cp		20
+    ld 		hl,AYCE_BGPal
+    ld 		de,wPalTab
+    lb 		bc,2,(4 _COLORS) * 4
+	call	z,SetFadeToWhite
     ld      a,[hl]
     rrca
     jr      nc,.even
@@ -228,6 +229,16 @@ AYCE_VBlank:
     push    de
     push    hl
 	call	ProcFade
+	
+    ld      hl,wPalTab
+    ld      a,%10000000 | 0 ; palette index 0, auto-increment
+    ldh     [rBGPI],a
+    ld      c,LOW(rBGPD)
+    rept (4 _COLORS) * 4 ; 4 palettes to load
+        ld      a,[hl+]
+        ldh     [c],a
+    endr
+	
     call    SoundSystem_Process
     ld      a,[hCurBank]
     ld      [MBC5RomBankLo],a
