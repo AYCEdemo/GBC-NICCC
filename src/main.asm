@@ -36,6 +36,7 @@ Main:
     call DotPlotter_Precalc
     call NotGBA
     call DotPlotter
+	call IntroScreens
     call PolyStream
     jp Credits
 
@@ -181,6 +182,20 @@ UpdateMusic::
 ; b = steps per update
 ; c = num colors
 
+SetFadeToBlack::
+    call SetFadeCommon
+    xor a
+    ld bc, wFadeTargets
+    ld de, wFadeCurrents
+    jp SetFadeCommon2
+
+SetFadeFromBlack::
+    call SetFadeCommon
+    xor a
+    ld bc, wFadeCurrents
+    ld de, wFadeTargets
+    jp SetFadeCommon2
+
 SetFadeToWhite::
     call SetFadeCommon
     ld a, 31
@@ -204,7 +219,7 @@ SetFadeCommon:
     ld [wFadeCount], a
     ld a, b
     ld [wFadeStep], a
-    ret
+    ret 	
 
 SetFadeCommon2:
     push af
