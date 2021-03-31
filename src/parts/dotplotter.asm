@@ -21,14 +21,10 @@ DotPlotter_Pat3Time     EQU 17*34
 DotPlotter_TotalTime    EQU 17*48
 
 DotPlotter::
+    call HHDMA_Install
     call HHDMA_NoCallback
     di
-
     copycode DotPlotter_VBlankUpdate, VBlankInt
-    ; TEMP
-    xor a
-    ld [rIE], a
-    ld [rIF], a
     ei
     call BlackPalette
     ; LCD on, win off, tile $8000, map $9800, obj off

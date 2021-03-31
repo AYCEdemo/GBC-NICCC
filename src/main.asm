@@ -33,10 +33,10 @@ Main:
     call SoundSystem_Process
 
     ; demo parts
-    ; call DotPlotter_Precalc
-    ; call NotGBA
-    ; call DotPlotter
-    ; call PolyStream
+    call DotPlotter_Precalc
+    call NotGBA
+    call DotPlotter
+    call PolyStream
     jp Credits
 
 DecodeWLE::
