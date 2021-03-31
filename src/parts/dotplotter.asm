@@ -337,7 +337,7 @@ DotPlotter_Pat1GenCnt   EQU (DotPlotter_Pat1Dots * 3 + 1) / 2
     push af
     push bc
     ld a, b
-    ld [hLoopCnt], a ; save b
+    ldh [hLoopCnt], a ; save b
     rept 2 ; 1 turn
     sla c
     rla
@@ -459,9 +459,9 @@ DotPlotter_Pat1GenCnt   EQU (DotPlotter_Pat1Dots * 3 + 1) / 2
     ld a, [bc]
     ld c, a ; scale
     ld a, d
-    ld [hLoopCnt], a
+    ldh [hLoopCnt], a
     neg
-    ld [hLoopCnt2], a
+    ldh [hLoopCnt2], a
     push de
 
     ld de, 256 * 256 / DotPlotter_Pat3Dots / 2
@@ -489,7 +489,7 @@ DotPlotter_Pat1GenCnt   EQU (DotPlotter_Pat1Dots * 3 + 1) / 2
     ld [hl+], a
     ld a, d
     ld [hl+], a
-    ld a, [hLoopCnt]
+    ldh a, [hLoopCnt]
     ld [hl+], a
     ; +x +y -z
     ld a, e
@@ -500,21 +500,21 @@ DotPlotter_Pat1GenCnt   EQU (DotPlotter_Pat1Dots * 3 + 1) / 2
     ld [hl+], a
     neg
     ld d, a
-    ld a, [hLoopCnt2]
+    ldh a, [hLoopCnt2]
     ld [hl+], a
     ; -x -y +z
     ld a, e
     ld [hl+], a
     ld a, d
     ld [hl+], a
-    ld a, [hLoopCnt]
+    ldh a, [hLoopCnt]
     ld [hl+], a
     ; -x -y -z
     ld a, e
     ld [hl+], a
     ld a, d
     ld [hl+], a
-    ld a, [hLoopCnt2]
+    ldh a, [hLoopCnt2]
     ld [hl+], a
 
     pop de

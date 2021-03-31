@@ -157,229 +157,111 @@ PolyStream_FaceLoop:
     ; save polystream address
     push hl
 
-PolyStream_FindMinMax:
-    ASSERT (wMaxX - wMinX) == 1
-    ASSERT (wMinY - wMaxX) == 1
-    ASSERT (wMaxY - wMinY) == 1
-    xor a
-    ld [wMaxX], a
-    ld [wMaxY], a
+    ld a, $80 ; 0.5
+    ldh [hCurX0], a
+    ldh [hCurX1], a
+    ; find minimum y position and start from that index
+    ld c, LOW(hVertTabY)
+    ld a, [wVertCount]
     dec a
-    ld [wMinX], a
-    ld [wMinY], a
-    ld de, wVertTab
-    ld a, [wVertCount]
+    ldh [hVertRemain], a
+    add LOW(hVertTabY)+1
     ld b, a
-.loop
-    ld a, [de]
-    inc de
-    ld hl, wMinX
-    cp [hl]
-    jr nc, .notminx
-    ld [hl], a
-.notminx
-    inc hl ; ld hl, wMaxX
-    cp [hl]
-    jr c, .notmaxx
-    ld [hl], a
-.notmaxx
-    ld a, [de]
-    inc de
-    inc hl ; ld hl, wMinY
-    cp [hl]
-    jr nc, .notminy
-    ld [hl], a
-.notminy
-    inc hl ; ld hl, wMaxY
-    cp [hl]
-    jr c, .notmaxy
-    ld [hl], a
-.notmaxy
-    dec b
-    jr nz, .loop
-
-    ; divide x by 8 for tiles
-    ld hl, wMinX
-    ld a, [hl]
-    rrca
-    rrca
-    rrca
-    and $1f
-    ld [hl+], a
-    ld b, a
-    ld a, [hl] ; wMaxX
-    ; inc a ; adjust for end pos
-    ; dec a ; ceil
-    rrca
-    rrca
-    rrca
-    and $1f
-    inc a
-    sub b
-    ; sanity check from coordinate division: width is 0
-    jr nz, .nz2
-    inc a
-.nz2
-    ld [hl+], a ; wBoundWidth
-    ; round y to multiple of 4 due to unrolled loops
-    ld a, [hl] ; wMinY
-    and %11111100
-    ld [hl+], a
-    ld b, a
-    ld a, [hl] ; wMaxY
-    ; inc a ; adjust for end pos
-    ; dec a ; ceil
-    and %11111100
-    add 4
-    sub b
-    ; sanity check from coordinate division: height is 0
-    jr nz, .nz4
-    ld a, 4
-.nz4
-    ld [hl], a ; wBoundHeight
-
-PolyStream_ClearStrokeTable:
-    ; clear a stroke table based on current calculated bounds
-    ld a, [wMinX]
-    add HIGH(wStrokeTab)
-    ld h, a
-    ld a, [wMinY]
+    ldh [hVertTabLen], a
+    ld l, $ff
+    ld e, 0
+.findminy
+    ldh a, [c]
+    cp l
+    jr nc, .gt
+    ld l, a
+    ld e, c
+.gt
+    inc c
+    ld a, c
+    cp b
+    jr nz, .findminy
+    ld a, e
+    ldh [hVertTabIdx0], a
+    ldh [hVertTabIdx1], a
+    res 4, a ; change to x
     ld c, a
-    ld a, [wBoundWidth]
+    ldh a, [c]
+    ldh [hLastX0], a
+    ldh [hLastX1], a
+    ld a, l
+    ldh [hCurY], a
+    ldh [hVertTabY0], a
+    ldh [hVertTabY1], a
+
+    ; fall through
+
+polystream_findnextvert:    MACRO
+    ldh a, [hCurY]
     ld b, a
-    ; luckily, since `ld [hl+], a` takes 1 byte, this hack is possible
-    ld a, [wBoundHeight]
-    ld e, a
-    ld a, LOW(.clear)
-    sub e
-    ld e, a
-    ld a, HIGH(.clear)
-    sbc 0
+    ldh a, [hVertTabY\1]
+    cp b
+    jr z, .load\@
+    jr nc, .noload\@
+.load\@
     ld d, a
+    ldh a, [hVertRemain]
+    and a
+    jr z, .nodec\@
+    dec a
+    ldh [hVertRemain], a
+.nodec\@
+    ldh a, [hVertTabLen]
+    ld e, a
+    ldh a, [hVertTabIdx\1]
+.retry\@
+    IF \1 == 0
+        inc a
+        cp e
+        jr c, .nowrap\@
+        ld a, LOW(hVertTabY)
+.nowrap\@
+    ELSE
+        cp LOW(hVertTabY)+1
+        jr nc, .nowrap\@
+        ld a, e
+.nowrap\@
+        dec a
+    ENDC
+    ld c, a
+    ldh a, [c]
+    cp d
+    jr nc, .found\@
+    jr c, .noload\@
+    ; skip horizontal line
+    ld a, c
+    jr .retry\@
+.found\@
+    ldh [hVertTabY\1], a
+    ; calculate x changes per y
+    sub d
+    ld d, a ; y changes
+    ld a, c
+    ldh [hVertTabIdx\1], a
+    ldh a, [hLastX\1]
+    ldh [hCurX\1+1], a
+    ld e, a
+    res 4, c ; change to x
+    ldh a, [c]
+    ldh [hLastX\1], a
+    sub e
+    jr nz, .dodivide\@
+    ; x doesn't change
     xor a
-.loop
-    ld l, c
-    ; works like jp [de]
-    push de
-    ret
-
-    rept 104
-        ld [hl+], a
-    endr
-.clear
-    inc h
-    dec b
-    jp nz, .loop
-
-PolyStream_Stroke:
-    ; stroke edges for flood filling
-    ; polygons are wound counterclockwise
-    ; 01000000    01000000
-    ; 00010000    00110000
-    ; 10000000 -> 10000000
-    ; 00001000    11001000
-    ; 00000000    00111000
-
-    ld hl, wVertTab
-    ld a, [wVertCount]
-.edgeloop
-    push af
-    ld a, [hl+] ; x1
-    ld b, a
-    ld a, [hl+] ; y1
-    ld c, a
-    ld a, [hl+] ; x2
-    ld d, a
-    ld a, [hl-] ; y2
-    ld e, a
-    ld a, d
-    sub b
-    ; no need to stroke if x doesn't change :)
-    jp z, .skip
-    push hl ; save hl for next iteration
-    jr c, .reversex
-.noreversex
-    ld d, a ; dx
-    ld a, e
-    sub c
-    push af ; keep flags
-    inc c ; adjust for "stopper"
-    jr c, .reversey
-    jr .noreversey
-.reversex
-    ld b, d ; start at x2 instead
-    neg
-    ld d, a ; dx
-    ld a, c
-    ld c, e ; start at y2 instead
-    sub e
-    push af ; keep flags
-    jr nc, .noreversey
-.reversey
-    neg
-.noreversey
-    ld e, a
-    pop af ; get flags from the last sub
-    jr nz, .normal
-
-    ; y doesn't change, we have faster routine for this
-    ld a, c
-    cp 100
-    ; no need to stroke if it's always outside the display :)
-    jp nc, .pixdone
-    ld l, b
-    ld h, HIGH(OnePixelTable)
-    ld e, [hl]
-    ld l, c
-    ld a, b
-    rrca
-    rrca
-    rrca
-    and $f
-    add HIGH(wStrokeTab)
-    ld h, a
-    inc d ; also stroke the ending pixel
-    srl d
-    jr nc, .pixloop2
-    inc d
-    jr .noreload2
-.pixloop2
-    ld a, e
-    or [hl]
-    ld [hl], a
-    srl e
-    jr nc, .noreload2
-    inc h
-    ld e, %10000000
-.noreload2
-    ; unroll a bit
-    ld a, e
-    or [hl]
-    ld [hl], a
-    srl e
-    jr nc, .noreload3
-    inc h
-    ld e, %10000000
-.noreload3
-    dec d
-    jr nz, .pixloop2
-    jp .pixdone
-
-.normal
-    ; b = starting x
-    ; c = starting y
-    ; d = x difference
-    ; e = y difference
-    push de ; save difference for loop counter
+    ldh [hCurXAdd\1], a
+    ldh [hCurXAdd\1+1], a
+    jr .noload\@
+.dodivide\@
     push af ; save e's sign for later
-    ; ld a, d
-    ; dec a ; == 1?
-    ; jr nz, .dodivide
-    ; ld d, e
-    ; ld e, 0
-    ; jr .skipdivide
-
-.dodivide
+    jr nc, .noneg\@
+    neg
+.noneg\@
+    ld e, a
     ; d.e = e / d
     xor a
     srl d
@@ -405,118 +287,62 @@ PolyStream_Stroke:
     res IF_TIMER, [hl]
     ei
 
-.skipdivide
     pop af ; sign
-    jr nc, .positive
+    jr nc, .positive\@
     xor a
     sub e
-    ld e, a
-    ld a, 0
+    ldh [hCurXAdd\1], a
     sbc d
-    ld d, a
-.positive
-    ; calculate starting address and pixel
-    ld l, b
-    ld h, HIGH(OnePixelTable)
-    ld a, [hl]
-    ldh [hFraction], a ; temp
-    ld l, c
-    ld a, b
-    rrca
-    rrca
-    rrca
-    and $f
-    add HIGH(wStrokeTab)
-    ld h, a
-
-    pop bc ; get x difference for loop counter
-    inc b ; also stroke the ending pixel
-    ldh a, [hFraction] ; starting pixel
-    ld c, a
-    ; is increment a whole number?
+    add e
+    jr .done1\@
+.positive\@
     ld a, e
-    and a
-    jr z, .whole ; use faster routine
-    ld a, $80 ; round
-    ldh [hFraction], a
-    srl b
-    jr nc, .pixloop
-    inc b
-    jr .noreload
-.pixloop
-    ld a, c
-    or [hl]
-    ld [hl], a
-    ldh a, [hFraction]
-    add e
-    ldh [hFraction], a
-    ld a, l
+    ldh [hCurXAdd\1], a
+    ld a, d
+.done1\@
+    ldh [hCurXAdd\1+1], a
+.noload\@
+ENDM
+
+PolyStream_DrawLoop:
+    ; find next vertices on both two sides
+    polystream_findnextvert 0
+    polystream_findnextvert 1
+
+.skipfind
+    ; get current x positions and update to the next one
+    ldh a, [hCurX0]
+    ld c, a
+    ldh a, [hCurXAdd0]
+    add c
+    ldh [hCurX0], a
+    ldh a, [hCurX0+1]
+    ld d, a
+    ldh a, [hCurXAdd0+1]
     adc d
-    ld l, a
-    srl c
-    jr nc, .noreload
-    inc h
-    ld c, %10000000
-.noreload
-    ; unroll a bit
-    ld a, c
-    or [hl]
-    ld [hl], a
-    ldh a, [hFraction]
-    add e
-    ldh [hFraction], a
-    ld a, l
-    adc d
-    ld l, a
-    srl c
-    jr nc, .noreload4
-    inc h
-    ld c, %10000000
-.noreload4
-    dec b
-    jr nz, .pixloop
-    jr .pixdone
+    ldh [hCurX0+1], a
+    ldh a, [hCurX1]
+    ld c, a
+    ldh a, [hCurXAdd1]
+    add c
+    ldh [hCurX1], a
+    ldh a, [hCurX1+1]
+    ld e, a
+    ldh a, [hCurXAdd1+1]
+    adc e
+    ldh [hCurX1+1], a
+    ld a, e
+    cp d
+    ; no need to draw if x doesn't change :)
+    jp z, .skipdraw
+    jr nc, .noswap
+    ; e < d, swap is needed
+    ld e, d
+    ld d, a
+.noswap
+    ; draw scan line
 
-.whole
-    srl b
-    jr nc, .pixloop5
-    inc b
-    jr .noreload5
-.pixloop5
-    ld a, c
-    or [hl]
-    ld [hl], a
-    ld a, l
-    add d
-    ld l, a
-    srl c
-    jr nc, .noreload5
-    inc h
-    ld c, %10000000
-.noreload5
-    ; unroll a bit
-    ld a, c
-    or [hl]
-    ld [hl], a
-    ld a, l
-    add d
-    ld l, a
-    srl c
-    jr nc, .noreload6
-    inc h
-    ld c, %10000000
-.noreload6
-    dec b
-    jr nz, .pixloop5
-
-.pixdone
-    pop hl
-.skip
-    pop af
-    dec a
-    jp nz, .edgeloop
-
-PolyStream_ClearBuffer:
+.clearbuffer
     ; weirdly placed here to minimize wait time until
     ; the last render buffer transfer is completed
     ld a, [HHDMA_Status]
@@ -525,11 +351,11 @@ PolyStream_ClearBuffer:
     call nz, HHDMA_Wait
     ld a, [wClearBuffer]
     and a
-    jp z, .skip
+    jp z, .clearbufferskip
     xor a
     ld hl, sRenderBuf
     ld b, 32
-.loop
+.clearbufferloop
     rept 200 ; yep
         ld [hl+], a
     endr
@@ -537,72 +363,20 @@ PolyStream_ClearBuffer:
     ld l, a
     inc h
     dec b
-    jp nz, .loop
+    jp nz, .clearbufferloop
     ; no more clearing until the next frame
     ld [wClearBuffer], a
-.skip
+.clearbufferskip
 
-polystream_fill_ramcode_stofs:  MACRO
-    ld [RAMCode + PolyStream_Fill_RAMCode.\1 - PolyStream_Fill_RAMCode], a
-    ENDM
-
-PolyStream_Fill:
-    ; flood fill faces from edges in stroke table
-    ; then draw it with appropriate color to the render buffer
-    ; 01000000    01000000
-    ; 00110000    01110000
-    ; 10000000 -> 11110000
-    ; 11001000    00111000
-    ; 00111000    00000000
-
-    ; patch RAM code so that drawing instructions will replace
-    ; bit patterns accordingly to the current color
-    ld a, [wCurColor]
-    add a ; x2
-    add a ; x4
-    add LOW(PolyStream_Fill_Insns)
-    ld l, a
-    adc HIGH(PolyStream_Fill_Insns)
-    sub l
-    ld h, a
-    ld a, [hl+]
-    polystream_fill_ramcode_stofs op0_0
-    polystream_fill_ramcode_stofs op1_0
-    polystream_fill_ramcode_stofs op2_0
-    polystream_fill_ramcode_stofs op3_0
-    ld a, [hl+]
-    polystream_fill_ramcode_stofs op0_1
-    polystream_fill_ramcode_stofs op1_1
-    polystream_fill_ramcode_stofs op2_1
-    polystream_fill_ramcode_stofs op3_1
-    ld a, [hl+]
-    polystream_fill_ramcode_stofs op0_2
-    polystream_fill_ramcode_stofs op1_2
-    polystream_fill_ramcode_stofs op2_2
-    polystream_fill_ramcode_stofs op3_2
-    ld a, [hl]
-    polystream_fill_ramcode_stofs op0_3
-    polystream_fill_ramcode_stofs op1_3
-    polystream_fill_ramcode_stofs op2_3
-    polystream_fill_ramcode_stofs op3_3
-
-    ld a, [wMinY]
-    ld e, a
-    add a
-    ld l, a
-    ld a, [wMinX]
-    add HIGH(wStrokeTab)
-    ld d, a
-    ld a, [wMinX]
-    add HIGH(sRenderBuf)
-    ld h, a
-    ld a, [wBoundHeight]
-    ; last two bits should be cleared
-    rrca
-    rrca
-    ldh [hLoopReload], a
-    ld a, [wBoundWidth]
-    call RAMCode ; PolyStream_Fill_RAMCode
+.skipdraw
+    ld hl, hCurY
+    inc [hl]
+    ldh a, [hVertRemain]
+    and a
+    jp nz, PolyStream_DrawLoop
+    ldh a, [hVertTabY0]
+    cp [hl] ; curY goes over the last line yet?
+    jp nc, .skipfind
 
     ; restore polystream address for next iteration
     pop hl
@@ -1073,44 +847,44 @@ PolyStream_LoadVerts::
     and $f ; verts count
     ld [wVertCount], a
     ld b, a
-    ld de, wVertTab
+    ld c, LOW(hVertTabX)
     ld a, [wUseVertIndex]
     and a
     jr nz, .usevertindex
 .novertindex
     ld a, [hl+] ; x
     srl a ; /2
-    ld [de], a
-    inc de
+    ldh [c], a
     ld a, [hl+] ; y
     srl a ; /2
-    ld [de], a
-    inc de
+    set 4, c
+    ldh [c], a
+    res 4, c
+    inc c
     dec b
     jr nz, .novertindex
     jr .done
 .usevertindex
-    push bc
     ld a, [hl+]
-    ld c, a
-    ld b, HIGH(wVertArrayX)
-    ld a, [bc]
-    ld [de], a
-    inc de
-    inc b ; wVertArrayY
-    ld a, [bc]
-    ld [de], a
-    inc de
-    pop bc
+    ld e, a
+    ld d, HIGH(wVertArrayX)
+    ld a, [de]
+    ldh [c], a
+    inc d ; wVertArrayY
+    ld a, [de]
+    set 4, c
+    ldh [c], a
+    res 4, c
+    inc c
     dec b
     jr nz, .usevertindex
 .done
     ; close the polygon
-    ld a, [wVertTab]
-    ld [de], a
-    inc de
-    ld a, [wVertTab+1]
-    ld [de], a
+    ldh a, [hVertTabX]
+    ldh [c], a
+    set 4, c
+    ldh a, [hVertTabY]
+    ldh [c], a
     ret
 
 PolyStream_VBlankUpdate:

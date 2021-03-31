@@ -26,7 +26,6 @@ wLoadPal::      db
 wPalTab::       ds 12 _COLORS
 wPalTabTemp::   ds 12 _COLORS
 wVertCount::    db
-wVertTab::      ds 17*2
 wCurColor::     db
 wMinX::         db
 wBoundWidth::
@@ -68,6 +67,24 @@ hLoopCnt::      db
 hLoopCnt2::     db
 hLoopReload::   db
 hSavedSP::      db
+
+hCurX0::        dw
+hCurXAdd0::     dw
+hCurX1::        dw
+hCurXAdd1::     dw
+hLastX0::       db
+hLastX1::       db
+hCurY::         db
+hVertTabIdx0::  db
+hVertTabIdx1::  db
+hVertTabY0::    db
+hVertTabY1::    db
+hVertTabLen::   db
+hVertRemain::   db
+
+SECTION "Vertex Table", HRAM, ALIGN[5]
+hVertTabX::     ds 16
+hVertTabY::     ds 16
 
 hIsGBC          EQU $fffe
 EXPORT hIsGBC

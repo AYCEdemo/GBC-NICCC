@@ -287,21 +287,21 @@ Credits_Stroke:
     ; 00001000    00111000
     ; 00000000    00000000
 
-    ld hl, wVertTab
+    ld hl, hVertTabX
     ld a, [wVertCount]
 .edgeloop
     push af
     ld a, [hl+] ; x1
     ld b, a
+    push hl ; save hl for next iteration
+    ld a, [hl-] ; x2
+    ld d, a
+    set 4, l
     ld a, [hl+] ; y1
     ld c, a
-    ld a, [hl+] ; x2
-    ld d, a
-    ld a, [hl-] ; y2
-    ld e, a
+    ld e, [hl] ; y2
     ld a, d
     sub b
-    push hl ; save hl for next iteration
     jr c, .reversex
 .noreversex
     ld d, a ; dx
