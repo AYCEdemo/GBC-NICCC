@@ -76,6 +76,15 @@ GBCNICCCScreen_MainLoop:
     halt
     ld      hl,IntroScreen_Timer
     dec     [hl]
+	push	af
+	ld		b,b
+	ld		a,[hl]
+	cp		20
+    ld 		hl,GBCNICCCPal
+    ld 		de,wPalTab
+    lb 		bc,2,(4 _COLORS) * 4
+	call	z,SetFadeToBlack
+	pop		af
     jr      nz,GBCNICCCScreen_MainLoop
     
 AYCEScreen:
