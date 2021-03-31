@@ -66,7 +66,7 @@ hFraction::     db
 hLoopCnt::      db
 hLoopCnt2::     db
 hLoopReload::   db
-hSavedSP::      db
+hSavedSP::      dw
 
 hCurX0::        dw
 hCurXAdd0::     dw

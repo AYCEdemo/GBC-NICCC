@@ -4,8 +4,8 @@ import sys
 
 DUMP_PATH = "niccc.dump"
 SYM_PATH = "niccc.sym"
-SIZE = WIDTH, HEIGHT = 128, 128*3
-SCALE = 2
+SIZE = WIDTH, HEIGHT = 128, 128*2
+SCALE = 3
 
 DELTA_COLORS = [
     (0,0,0), (255,255,255), (127,127,255), (127,255,127)
@@ -20,7 +20,7 @@ for line in open(SYM_PATH, "r"):
         continue
     # ignore bank for now
     ofs = int(pars[0][3:], 16) - 0xa000
-    if ofs < 0 or ofs >= 0x4000:
+    if ofs < 0 or ofs >= 0x6000:
         continue
     sym[pars[1].strip()] = ofs
 
@@ -37,7 +37,7 @@ render_buf = [0]*128*16
 def read_dump():
     global init
     surf = pygame.Surface(SIZE)
-    dump = open(DUMP_PATH, "rb").read(0x4000)
+    dump = open(DUMP_PATH, "rb").read(0x6000)
     base_x, base_y = sym["wVertArrayX"], sym["wVertArrayY"]
     vert_tab = [(dump[i + base_x], dump[i + base_y]) for i in range(256)]
     # verts
@@ -47,8 +47,8 @@ def read_dump():
 
     # expected face
     cnt = dump[sym["wVertCount"]]
-    base = sym["wVertTab"]
-    verts = [(dump[i*2+base], dump[i*2+1+base]) for i in range(cnt)]
+    base = sym["hVertTabX"]
+    verts = [(dump[i+base], dump[i+base+16]) for i in range(cnt)]
     prevs = [surf.get_at(i) for i in verts]
     pygame.draw.polygon(surf, (255, 255, 255), verts)
     for i in range(cnt):
@@ -60,20 +60,6 @@ def read_dump():
         elif ref == 0:
             col = 0x0000ff
         surf.set_at(pos, col)
-
-    # stroke table
-    base = sym["wStrokeTab"]
-    addr = 0
-    for i in range(16):
-        for j in range(128):
-            bits = dump[base+i*256+j]
-            delta = 0 if init else stroke_tab[addr] ^ bits
-            stroke_tab[addr] = bits
-            for k in range(8):
-                sh = 7 - k
-                pix = ((bits >> sh) & 1) | (((delta >> sh) & 1) << 1)
-                surf.set_at((i*8+k, j+128), DELTA_COLORS[pix])
-            addr += 1
 
     # render buffer
     base = sym["sRenderBuf"]
@@ -92,17 +78,8 @@ def read_dump():
                 col = (pix*0x11, pix*0x11, pix*0x11)
                 if (delta >> sh) & 0x01010101 != 0:
                     col = COL_NEW if pix == cur_col else COL_NOT
-                surf.set_at((i*8+k, j+256), col)
+                surf.set_at((i*8+k, j+128), col)
             addr += 1
-
-    # bounds
-    x = dump[sym["wMinX"]] * 8
-    y = dump[sym["wMinY"]]
-    w = dump[sym["wBoundWidth"]] * 8 - 1
-    h = dump[sym["wBoundHeight"]] - 1
-    pygame.draw.rect(surf, (255,0,0,63), pygame.Rect(x,y    ,w,h))
-    pygame.draw.rect(surf, (255,0,0,63), pygame.Rect(x,y+128,w,h))
-    pygame.draw.rect(surf, (255,0,0,63), pygame.Rect(x,y+256,w,h))
 
     pygame.transform.scale(surf, (WIDTH*SCALE, HEIGHT*SCALE), screen)
     # screen.blit(surf, (0, 0))
@@ -117,7 +94,7 @@ while True:
     stat = os.stat(DUMP_PATH)
     size = stat.st_size
     mtime = stat.st_mtime_ns
-    if size == 0x4000 and mtime != last_dump:
+    if size >= 0x6000 and mtime != last_dump:
         read_dump()
         last_dump = mtime
 

@@ -19,6 +19,133 @@ CENTISEC_ADD_2LINES     EQU 1425
 ;   2: stream finished, display the total time
 wDemoState  EQUS "(wDemoTimer + 1)"
 
+polystream_findnextvert:    MACRO
+    ldh a, [hCurY]
+    ld b, a
+    ldh a, [hVertTabY\1]
+    cp b
+    jr z, .load\@
+    jr nc, .noload\@
+.load\@
+    ld d, a
+    ldh a, [hVertRemain]
+    and a
+    jr z, .nodec\@
+    dec a
+    ldh [hVertRemain], a
+.nodec\@
+    ldh a, [hVertTabLen]
+    ld e, a
+    ldh a, [hVertTabIdx\1]
+.retry\@
+    IF \1 == 0
+        inc a
+        cp e
+        jr c, .nowrap\@
+        ld a, LOW(hVertTabY)
+.nowrap\@
+    ELSE
+        cp LOW(hVertTabY)+1
+        jr nc, .nowrap\@
+        ld a, e
+.nowrap\@
+        dec a
+    ENDC
+    ld c, a
+    ldh a, [c]
+    cp d
+    jr z, .skip\@
+    jr c, .noload\@
+    ldh [hVertTabY\1], a
+    ; calculate x changes per y
+    sub d
+    ld d, a ; y changes
+    ld a, c
+    ldh [hVertTabIdx\1], a
+    ldh a, [hLastX\1]
+    ldh [hCurX\1+1], a
+    ld e, a
+    res 4, c ; change to x
+    ldh a, [c]
+    ldh [hLastX\1], a
+    sub e
+    jr nz, .dodivide\@
+    ; x doesn't change
+    xor a
+    ldh [hCurXAdd\1], a
+    ldh [hCurXAdd\1+1], a
+    jr .noload\@
+
+.skip\@
+    ; skip horizontal line
+    ldh a, [hLastX\1]
+    ldh [hCurX\1+1], a
+    ld b, c
+    res 4, c ; change to x
+    ldh a, [c]
+    ldh [hLastX\1], a
+    ld a, b
+    jr .retry\@
+
+.dodivide\@
+    push af ; save e's sign for later
+    jr nc, .noneg\@
+    neg
+.noneg\@
+    ld e, a
+    ; d.e = e / d
+    xor a
+    srl d
+    rra
+    or e
+    ld l, a
+    ld a, d
+    add $40
+    ld h, a
+    ld a, DIVTAB_BANK
+    ; turn off interrupts since VBlank relies on hCurBank to restore
+    ; the bank back and could potentially mess up the table lookup
+    di
+    ld [MBC5RomBankLo], a
+    ld e, [hl]
+    inc a
+    ld [MBC5RomBankLo], a
+    ld d, [hl]
+    ldh a, [hCurBank]
+    ld [MBC5RomBankLo], a
+    ld hl, rIF
+    ; avoid HHDMA firing right after enabling interrupts and miss the timing
+    res IF_TIMER, [hl]
+    ei
+
+    pop af ; sign
+    jr nc, .positive\@
+    xor a
+    sub e
+    ldh [hCurXAdd\1], a
+    sbc d
+    add e
+    jr .done1\@
+.positive\@
+    ld a, e
+    ldh [hCurXAdd\1], a
+    ld a, d
+.done1\@
+    ldh [hCurXAdd\1+1], a
+.noload\@
+ENDM
+
+div8:   MACRO
+    rrca
+    rrca
+    rrca
+    and $1f
+ENDM
+
+polystream_fill_ramcode_stofs:  MACRO
+    ld [RAMCode + PolyStream_Fill_RAMCode.\1 - PolyStream_Fill_RAMCode], a
+    ENDM
+
 PolyStream::
     ; clear the entire sRenderBuf
     xor a
@@ -142,6 +269,7 @@ PolyStream_Loop:
     bit 2, e
     call nz, PolyStream_ReadVertArray
     ld [wUseVertIndex], a
+    ; fall through
 
 PolyStream_FaceLoop:
     ld a, [hl+]
@@ -157,10 +285,49 @@ PolyStream_FaceLoop:
     ; save polystream address
     push hl
 
+    ; patch RAM code so that drawing instructions will replace
+    ; bit patterns accordingly to the current color
+    ld a, [wCurColor]
+    add a ; x2
+    add a ; x4
+    ld b, a
+    add LOW(PolyStream_OpN_Insns)
+    ld l, a
+    adc HIGH(PolyStream_OpN_Insns)
+    sub l
+    ld h, a
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs op0_0
+    polystream_fill_ramcode_stofs op1_0
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs op0_1
+    polystream_fill_ramcode_stofs op1_1
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs op0_2
+    polystream_fill_ramcode_stofs op1_2
+    ld a, [hl]
+    polystream_fill_ramcode_stofs op0_3
+    polystream_fill_ramcode_stofs op1_3
+    ld a, b
+    add LOW(PolyStream_OpI_Insns)
+    ld l, a
+    adc HIGH(PolyStream_OpI_Insns)
+    sub l
+    ld h, a
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs opi_0
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs opi_1
+    ld a, [hl+]
+    polystream_fill_ramcode_stofs opi_2
+    ld a, [hl]
+    polystream_fill_ramcode_stofs opi_3
+
     ld a, $80 ; 0.5
     ldh [hCurX0], a
     ldh [hCurX1], a
     ; find minimum y position and start from that index
+    ; also find maximum y position in case the face is a horizontal line
     ld c, LOW(hVertTabY)
     ld a, [wVertCount]
     dec a
@@ -168,10 +335,14 @@ PolyStream_FaceLoop:
     add LOW(hVertTabY)+1
     ld b, a
     ldh [hVertTabLen], a
-    ld l, $ff
-    ld e, 0
+    lb hl, 0, $ff
+    ld e, h
 .findminy
     ldh a, [c]
+    cp h
+    jr c, .lt
+    ld h, a
+.lt
     cp l
     jr nc, .gt
     ld l, a
@@ -193,116 +364,9 @@ PolyStream_FaceLoop:
     ldh [hCurY], a
     ldh [hVertTabY0], a
     ldh [hVertTabY1], a
-
+    cp h
+    jp z, PolyStream_FaceDone
     ; fall through
-
-polystream_findnextvert:    MACRO
-    ldh a, [hCurY]
-    ld b, a
-    ldh a, [hVertTabY\1]
-    cp b
-    jr z, .load\@
-    jr nc, .noload\@
-.load\@
-    ld d, a
-    ldh a, [hVertRemain]
-    and a
-    jr z, .nodec\@
-    dec a
-    ldh [hVertRemain], a
-.nodec\@
-    ldh a, [hVertTabLen]
-    ld e, a
-    ldh a, [hVertTabIdx\1]
-.retry\@
-    IF \1 == 0
-        inc a
-        cp e
-        jr c, .nowrap\@
-        ld a, LOW(hVertTabY)
-.nowrap\@
-    ELSE
-        cp LOW(hVertTabY)+1
-        jr nc, .nowrap\@
-        ld a, e
-.nowrap\@
-        dec a
-    ENDC
-    ld c, a
-    ldh a, [c]
-    cp d
-    jr nc, .found\@
-    jr c, .noload\@
-    ; skip horizontal line
-    ld a, c
-    jr .retry\@
-.found\@
-    ldh [hVertTabY\1], a
-    ; calculate x changes per y
-    sub d
-    ld d, a ; y changes
-    ld a, c
-    ldh [hVertTabIdx\1], a
-    ldh a, [hLastX\1]
-    ldh [hCurX\1+1], a
-    ld e, a
-    res 4, c ; change to x
-    ldh a, [c]
-    ldh [hLastX\1], a
-    sub e
-    jr nz, .dodivide\@
-    ; x doesn't change
-    xor a
-    ldh [hCurXAdd\1], a
-    ldh [hCurXAdd\1+1], a
-    jr .noload\@
-.dodivide\@
-    push af ; save e's sign for later
-    jr nc, .noneg\@
-    neg
-.noneg\@
-    ld e, a
-    ; d.e = e / d
-    xor a
-    srl d
-    rra
-    or e
-    ld l, a
-    ld a, d
-    add $40
-    ld h, a
-    ld a, DIVTAB_BANK
-    ; turn off interrupts since VBlank relies on hCurBank to restore
-    ; the bank back and could potentially mess up the table lookup
-    di
-    ld [MBC5RomBankLo], a
-    ld e, [hl]
-    inc a
-    ld [MBC5RomBankLo], a
-    ld d, [hl]
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
-    ei
-
-    pop af ; sign
-    jr nc, .positive\@
-    xor a
-    sub e
-    ldh [hCurXAdd\1], a
-    sbc d
-    add e
-    jr .done1\@
-.positive\@
-    ld a, e
-    ldh [hCurXAdd\1], a
-    ld a, d
-.done1\@
-    ldh [hCurXAdd\1+1], a
-.noload\@
-ENDM
 
 PolyStream_DrawLoop:
     ; find next vertices on both two sides
@@ -312,35 +376,33 @@ PolyStream_DrawLoop:
 .skipfind
     ; get current x positions and update to the next one
     ldh a, [hCurX0]
-    ld c, a
+    ld b, a
     ldh a, [hCurXAdd0]
-    add c
+    add b
     ldh [hCurX0], a
     ldh a, [hCurX0+1]
-    ld d, a
+    ld c, a
     ldh a, [hCurXAdd0+1]
-    adc d
+    adc c
     ldh [hCurX0+1], a
     ldh a, [hCurX1]
-    ld c, a
+    ld b, a
     ldh a, [hCurXAdd1]
-    add c
+    add b
     ldh [hCurX1], a
     ldh a, [hCurX1+1]
-    ld e, a
-    ldh a, [hCurXAdd1+1]
-    adc e
-    ldh [hCurX1+1], a
-    ld a, e
-    cp d
-    ; no need to draw if x doesn't change :)
-    jp z, .skipdraw
-    jr nc, .noswap
-    ; e < d, swap is needed
-    ld e, d
     ld d, a
+    ldh a, [hCurXAdd1+1]
+    adc d
+    ldh [hCurX1+1], a
+    ld a, d
+    cp c
+    jr nc, .noswap
+    ; d < c, swap is needed
+    ld d, c
+    ld c, a
 .noswap
-    ; draw scan line
+    inc d ; include ending pixel
 
 .clearbuffer
     ; weirdly placed here to minimize wait time until
@@ -367,6 +429,27 @@ PolyStream_DrawLoop:
     ; no more clearing until the next frame
     ld [wClearBuffer], a
 .clearbufferskip
+    ; draw scan line
+    ld b, HIGH(StartPixelTable)
+    ldh a, [hCurY]
+    add a
+    ld l, a
+    ld a, c
+    div8
+    add HIGH(sRenderBuf)
+    ld h, a
+    ld a, [bc]
+    ld e, a
+    ld a, d
+    div8
+    add HIGH(sRenderBuf)
+    polystream_fill_ramcode_stofs op2 + 1 ; substitution abuse, might break
+    sub h
+    jp z, RAMCode + PolyStream_Fill_RAMCode.sametile - PolyStream_Fill_RAMCode
+    dec a
+    jp z, RAMCode + PolyStream_Fill_RAMCode.nointerim - PolyStream_Fill_RAMCode
+    jp RAMCode
+.ramcodereturn
 
 .skipdraw
     ld hl, hCurY
@@ -376,9 +459,10 @@ PolyStream_DrawLoop:
     jp nz, PolyStream_DrawLoop
     ldh a, [hVertTabY0]
     cp [hl] ; curY goes over the last line yet?
-    jp nc, .skipfind
+    jp nc, PolyStream_DrawLoop
 
     ; restore polystream address for next iteration
+PolyStream_FaceDone:
     pop hl
     jp PolyStream_FaceLoop
 
@@ -588,68 +672,92 @@ PolyStream_End:
     jr nz, .clearloop
     ret
 
-polystream_fill_ramcode_:   MACRO
-    ld a, [de]
-    inc e
-    xor b
+PolyStream_Fill_RAMCode:
+    ; a holds number of interim columns
+    push hl ; save starting hl
+    lb bc, $ff, 0
+.interimloop
+    inc h ; move to next column
+.opi_0
+    ld [hl], c
+    inc l
+.opi_1
+    ld [hl], c
+    set 4, h
+.opi_3
+    ld [hl], c
+    dec l
+.opi_2
+    ld [hl], c
+    res 4, h
+    dec a
+    jr nz, .interimloop
+    pop hl
+
+.nointerim
+    ; starting column
+    ld a, e
     ld b, a
-    jr z, .skip\@
     cpl
     ld c, a
     ld a, [hl]
-.op\1_0
+.op0_0
     and c
     ld [hl+], a
     ld a, [hl]
-.op\1_1
+.op0_1
     and c
     ld [hl-], a
-    ; change to the second buffer which is luckily 16 pages away
     set 4, h
     ld a, [hl]
-.op\1_2
+.op0_2
     and c
     ld [hl+], a
     ld a, [hl]
-.op\1_3
+.op0_3
     and c
     ld [hl-], a
-    ; change back to the first buffer
-    res 4, h
-.skip\@
-    inc l
-    inc l
-    ENDM
 
-PolyStream_Fill_RAMCode:
-    ldh [hLoopCnt], a
-    ldh a, [hLoopReload]
-    ld b, 0
-    push de
-    push hl
+    ; ending column
+.op2
+    ld h, 0
+    ld b, HIGH(StartPixelTable)
+    ld c, d
+    ld a, [bc]
+    ld c, a
+    cpl
+    ld b, a
+    jr .draw
 
-.loop2
-    ldh [hLoopCnt2], a
-    polystream_fill_ramcode_ 0
-    polystream_fill_ramcode_ 1
-    polystream_fill_ramcode_ 2
-    polystream_fill_ramcode_ 3
-    ldh a, [hLoopCnt2]
-    dec a
-    jr nz, .loop2
-
-    pop hl
-    pop de
-    inc d
-    inc h
-    ldh a, [hLoopCnt]
-    dec a
-    jp nz, RAMCode
-
-    ret
+.sametile
+    ld c, d
+    ld a, [bc]
+    xor e
+    ld b, a
+    cpl
+    ld c, a
+.draw
+    ld a, [hl]
+.op1_0
+    and c
+    ld [hl+], a
+    ld a, [hl]
+.op1_1
+    and c
+    ld [hl-], a
+    set 4, h
+    ld a, [hl]
+.op1_2
+    and c
+    ld [hl+], a
+    ld a, [hl]
+.op1_3
+    and c
+    ld [hl-], a
+    jp PolyStream_DrawLoop.ramcodereturn
 .end
 
-PolyStream_Fill_Insns:
+PolyStream_OpN_Insns:
 _x = 0
     rept 16
 _y = 1
@@ -658,6 +766,21 @@ _y = 1
             or b
         ELSE
             and c
+        ENDC
+_y = _y << 1
+        endr
+_x = _x + 1
+    endr
+
+PolyStream_OpI_Insns:
+_x = 0
+    rept 16
+_y = 1
+        rept 4
+        IF _x & _y
+            ld [hl], b
+        ELSE
+            ld [hl], c
         ENDC
 _y = _y << 1
         endr
