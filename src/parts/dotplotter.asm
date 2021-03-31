@@ -26,10 +26,6 @@ DotPlotter::
     di
 
     copycode DotPlotter_VBlankUpdate, VBlankInt
-    ; TEMP
-    xor a
-    ld [rIE], a
-    ld [rIF], a
     ei
     call BlackPalette
     ; LCD on, win off, tile $8000, map $9800, obj off
