@@ -402,7 +402,6 @@ PolyStream_DrawLoop:
     ld d, c
     ld c, a
 .noswap
-    inc d ; include ending pixel
 
 .clearbuffer
     ; weirdly placed here to minimize wait time until
@@ -717,24 +716,22 @@ PolyStream_Fill_RAMCode:
 
     ; ending column
 .endcolumn
-    ld b, HIGH(StartPixelTable)
+    ld b, HIGH(EndPixelTable)
     ld c, d
     ld a, [bc]
-    ld c, a
-    cpl
-    ld b, a
     jr .draw
 
 .sametile
     ld a, [bc]
     ld e, a
+    inc b ; ld b, HIGH(EndPixelTable)
     ld c, d
     ld a, [bc]
-    xor e
+    and e
+.draw
     ld b, a
     cpl
     ld c, a
-.draw
     ld a, [hl]
 .op1_0
     and c
