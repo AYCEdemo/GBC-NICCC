@@ -36,6 +36,7 @@ polystream_findnextvert:    MACRO
 .nodec\@
     ldh a, [hVertTabLen]
     ld e, a
+    ld hl, hLastX\1
     ldh a, [hVertTabIdx\1]
 .retry\@
     IF \1 == 0
@@ -62,12 +63,12 @@ polystream_findnextvert:    MACRO
     ld d, a ; y changes
     ld a, c
     ldh [hVertTabIdx\1], a
-    ldh a, [hLastX\1]
+    ld a, [hl]
     ldh [hCurX\1+1], a
     ld e, a
     res 4, c ; change to x
     ldh a, [c]
-    ldh [hLastX\1], a
+    ld [hl], a
     sub e
     jr nz, .dodivide\@
     ; x doesn't change
@@ -78,12 +79,12 @@ polystream_findnextvert:    MACRO
 
 .skip\@
     ; skip horizontal line
-    ldh a, [hLastX\1]
+    ld a, [hl]
     ldh [hCurX\1+1], a
     ld b, c
     res 4, c ; change to x
     ldh a, [c]
-    ldh [hLastX\1], a
+    ld [hl], a
     ld a, b
     jr .retry\@
 
@@ -133,13 +134,6 @@ polystream_findnextvert:    MACRO
 .done1\@
     ldh [hCurXAdd\1+1], a
 .noload\@
-ENDM
-
-div8:   MACRO
-    rrca
-    rrca
-    rrca
-    and $1f
 ENDM
 
 polystream_fill_ramcode_stofs:  MACRO
@@ -373,28 +367,25 @@ PolyStream_DrawLoop:
     polystream_findnextvert 0
     polystream_findnextvert 1
 
-.skipfind
     ; get current x positions and update to the next one
-    ldh a, [hCurX0]
-    ld b, a
+    ASSERT (hCurX1 - hCurX0) == 2
+    ld hl, hCurX0
+    ld b, [hl]
     ldh a, [hCurXAdd0]
     add b
-    ldh [hCurX0], a
-    ldh a, [hCurX0+1]
-    ld c, a
+    ld [hl+], a
+    ld c, [hl] ; hCurX0+1
     ldh a, [hCurXAdd0+1]
     adc c
-    ldh [hCurX0+1], a
-    ldh a, [hCurX1]
-    ld b, a
+    ld [hl+], a
+    ld b, [hl] ; hCurX1
     ldh a, [hCurXAdd1]
     add b
-    ldh [hCurX1], a
-    ldh a, [hCurX1+1]
-    ld d, a
+    ld [hl+], a
+    ld d, [hl] ; hCurX1+1
     ldh a, [hCurXAdd1+1]
     adc d
-    ldh [hCurX1+1], a
+    ld [hl], a
     ld a, d
     cp c
     jr nc, .noswap
@@ -430,17 +421,16 @@ PolyStream_DrawLoop:
 .clearbufferskip
     ; draw scan line
     ld b, HIGH(StartPixelTable)
+    ld h, HIGH(RenderBufTable)
+    ld l, d
+    ld e, [hl]
+    ld l, c
+    ld h, [hl]
     ldh a, [hCurY]
     add a
     ld l, a
-    ld a, c
-    div8
-    ld e, a
-    add HIGH(sRenderBuf)
-    ld h, a
-    ld a, d
-    div8
-    sub e
+    ld a, e
+    sub h
     jp z, RAMCode + PolyStream_Fill_RAMCode.sametile - PolyStream_Fill_RAMCode
     ld e, a
     jp RAMCode
@@ -748,7 +738,7 @@ PolyStream_Fill_RAMCode:
     ld a, [hl]
 .op1_3
     and c
-    ld [hl-], a
+    ld [hl], a
     jp PolyStream_DrawLoop.ramcodereturn
 .end
 
@@ -940,7 +930,22 @@ PolyStream_ReadVertArray::
     ld a, [hl+]
     ld b, a
     ld de, wVertArrayX
+    srl b
+    jr nc, .loop
+    inc b
+    jr .loop2
 .loop
+    ld a, [hl+] ; x pos
+    srl a ; /2
+    ld [de], a
+    inc d ; wVertArrayY
+    ld a, [hl+] ; y pos
+    srl a ; /2
+    ld [de], a
+    dec d
+    inc e
+.loop2
+    ; unroll a bit
     ld a, [hl+] ; x pos
     srl a ; /2
     ld [de], a
@@ -981,7 +986,8 @@ PolyStream_LoadVerts::
     inc c
     dec b
     jr nz, .novertindex
-    jr .done
+    ret
+
 .usevertindex
     ld a, [hl+]
     ld e, a
@@ -996,13 +1002,6 @@ PolyStream_LoadVerts::
     inc c
     dec b
     jr nz, .usevertindex
-.done
-    ; close the polygon
-    ldh a, [hVertTabX]
-    ldh [c], a
-    set 4, c
-    ldh a, [hVertTabY]
-    ldh [c], a
     ret
 
 PolyStream_VBlankUpdate:

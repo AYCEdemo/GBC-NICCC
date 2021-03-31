@@ -3,9 +3,9 @@ INCLUDE "src/hw.asm"
 
 SECTION "Dot Plotter", ROM0
 
-DotPlotter_Buffer       EQUS "sRenderBuf"
-DotPlotter_TileMap      EQUS "(sRenderBuf+256*20)"
-DotPlotter_AttrMap      EQUS "(sRenderBuf+256*20+32*18)"
+DotPlotter_Buffer       EQU $a000
+DotPlotter_TileMap      EQU $a000+256*20
+DotPlotter_AttrMap      EQU $a000+256*20+32*18
 
 DotPlotter_TileDataDst  EQU $8000
 DotPlotter_TileMapDst   EQU $9800
@@ -185,14 +185,10 @@ DotPlotter_PlotPixels:
     ld a, [hl]
     add 80 - 64
     ld l, a
+    ld h, HIGH(RenderBufTable)
+    ld d, [hl]
     ld h, HIGH(OnePixelTable)
     ld h, [hl] ; pixel data
-    and %11111000
-    rrca
-    rrca
-    rrca
-    add HIGH(DotPlotter_Buffer)
-    ld d, a
     ld a, [de]
     or h
     ld [de], a

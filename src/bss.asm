@@ -69,8 +69,8 @@ hLoopReload::   db
 hSavedSP::      dw
 
 hCurX0::        dw
-hCurXAdd0::     dw
 hCurX1::        dw
+hCurXAdd0::     dw
 hCurXAdd1::     dw
 hLastX0::       db
 hLastX1::       db

@@ -129,6 +129,13 @@ Credits_FaceLoop:
     jp z, Credits_DonePoly
 
     call PolyStream_LoadVerts
+    ; close the polygon
+    ; c still holds the next index
+    ldh a, [hVertTabX]
+    ldh [c], a
+    set 4, c
+    ldh a, [hVertTabY]
+    ldh [c], a
     ; save polystream address
     push hl
 
