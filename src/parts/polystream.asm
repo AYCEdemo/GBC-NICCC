@@ -7,6 +7,18 @@ PolyStream_TileDataDst  EQU $8000
 PolyStream_TileMapDst   EQU $9800
 PolyStream_TileMapDst2  EQU $9c00
 
+; 70224 * 65536 * 100 / 4194304
+CENTISEC_ADD_FRAME      EQU 109725
+; 456 * 2 * 65536 * 100 / 4194304
+CENTISEC_ADD_2LINES     EQU 1425
+
+; bit   0: fading, call ProcFade every VBlank
+; bit 1-2: state
+;   0: pre-fade in, wait for the first frame to be rendered
+;   1: stream running
+;   2: stream finished, display the total time
+wDemoState  EQUS "(wDemoTimer + 1)"
+
 PolyStream::
     ; clear the entire sRenderBuf
     xor a
@@ -25,18 +37,22 @@ PolyStream::
 
     ld a, $80
     ldh [rBGPI], a
-    ld c, LOW(rBGPD)
     xor a
-    ldh [c], a
-    ldh [c], a
-    ldh [rBGPD], a
-    ldh [rBGPD], a
     ldh [rVBK], a
     ldh [rSVBK], a
+    ld [wDemoTimer], a
+    ld [wDemoState], a
     dec a ; ld a, $ff
-    rept 3 _COLORS
+    ld hl, wPalTab
+    lb bc, 3 _PALETTES, LOW(rBGPD)
+.whitepal
     ldh [c], a
-    endr
+    ld [hl+], a
+    dec b
+    jr nz, .whitepal
+    ; Also write white to pal 0 col 2
+    ld [wPalTabTemp+4], a
+    ld [wPalTabTemp+5], a
 
     ; Clear tile $ff
     xor a
@@ -79,8 +95,7 @@ PolyStream::
     coord hl, 2, 4, PolyStream_TileMapDst2
     call PolyStream_SetAttrs
 
-    ; LCD on, win on, win $9800, tile $8000, map $9800, obj off
-    ld a, %10110001
+    ld a, LCDC_ON | LCDC_WINON | LCDC_BG8000 | LCDC_BGPRIO
     ldh [rLCDC], a
     xor a
     ldh [rSCX], a
@@ -607,13 +622,199 @@ PolyStream_DonePoly:
     xor a
     ld [wCurRender], a
     call PolyStream_HHDMACallback
+
+    ; advance demo state for the first frame
+    ld a, [wDemoState]
+    and a
+    jr nz, .skip
+    ld hl, wPalTabTemp
+    ld de, wPalTab
+    lb bc, 3, 12
+    call SetFadeFromWhite
+    ld a, 11
+    ld [wDemoTimer], a
+    ld a, 1
+    ld [wDemoState], a
+.skip
     pop hl
     jp PolyStream_Loop
 
 PolyStream_End:
-.loop
+    ; we are finally done
+    ; get the current line position for later
+    ldh a, [rLY]
+    push af
+    ; copy the current timer from the vram
+    di ; don't let interupts get in the way
+    ld [hSavedSP], sp
+    ld c, LOW(rVBK)
+    ldh a, [c]
+    ld b, a
+    xor a
+    ldh [c], a
+    coord sp, 11, 1, PolyStream_TileMapDst
+    ld hl, rSTAT
+    waitmode0
+    ld hl, wInfoTilesBuf
+    rept 7 / 2
+    pop de
+    ld a, e
+    ld [hl+], a
+    ld a, d
+    ld [hl+], a
+    endr
+    pop de
+    ld [hl], e
+
+    ld a, b
+    ldh [c], a
+    ldh a, [hSavedSP]
+    ld l, a
+    ldh a, [hSavedSP+1]
+    ld h, a
+    ld sp, hl
+    ld hl, rIF
+    res IF_TIMER, [hl]
+    ei
+
+    ld a, 2 << 1
+    ld [wDemoState], a
+    ; approximate final centisec from the current line position
+    pop af
+    add 10 ; VBlank lines
+    ld de, CENTISEC_ADD_2LINES
+    ; ahl = de * a
+    lb bc, 8, 0
+    ld h, c
+    ld l, c
+.mulloop
+    add hl, hl
+    rla
+    jr nc, .noadd
+    add hl, de
+    adc c ; adc 0
+.noadd
+    dec b
+    jr nz, .mulloop
+    ; /2 to get 1 line time
+    rra
+    rr h
+    rr l
+    ld c, a
+    ; no need to write back, just wanted to propagate the carry
+    ld a, [wCSecFraction]
+    add l
+    ld a, [wCSecFraction+1]
+    adc h
+    ld hl, wInfoTilesBuf + 6
+    ; a bit speedup
+    lb de, $fa, 10
+    ld a, [hl]
+    adc c
+    cp d ; 10
+    jr c, .donenum
+    sub e
+    ld [hl-], a
+    ld a, [hl] ; ds
+    inc a
+    cp d
+    jr c, .donenum
+    sub e
+    ld [hl-], a
+    dec hl ; .
+    ld a, [hl] ; s
+    inc a
+    cp d
+    jr c, .donenum
+    sub e
+    ld [hl-], a
+    ld a, [hl] ; 10s
+    inc a
+    cp $f6
+    jr c, .donenum
+    sub 6
+    ld [hl-], a
+    dec hl ; :
+    ld a, [hl] ; m
+    inc a
+.donenum
+    ld [hl], a
+
+    ; TODO pause according to music sync byte
+    call HHDMA_Wait
+    xor a ; 256 frames
+.delay
     halt
-    jr .loop
+    dec a
+    jr nz, .delay
+
+    ; I'm too lazy to write another VBlank routine for this
+    di
+    ld a, $80
+    ldh [rBGPI], a
+    xor a
+    ldh [rVBK], a
+    ; blank / white
+    dec a ; ld a, $ff
+    halt ; wait for vblank
+    call .clear
+    ldh [rBGPD], a
+    ldh [rBGPD], a
+    ldh [rVBK], a ; set to bank 1 basically
+    xor a
+    call .clear
+    ldh [rSCY], a
+    ldh [rIF], a
+    ld a, LCDC_ON | LCDC_BG8000 | LCDC_BGPRIO
+    ldh [rLCDC], a
+
+    ld b, 15
+.fadeout
+    push bc
+    ; we only have one color to fade out
+    ld a, $80
+    ldh [rBGPI], a
+    ld a, b
+    dec a       ; 0000rrrr
+    cp 8        ; bit 3 -> carry
+    ccf
+    rla         ; 000rrrrr
+    ld c, a
+    swap a      ; gggg000g
+    rrca        ; ggggg000
+    ld b, c     ; 000bbbbb
+    add a       ; gggg0000
+    rl b        ; 00bbbbbg
+    add a       ; ggg00000
+    rl b        ; 0bbbbbgg
+    or c        ; gggrrrrr
+
+    halt ; wait for vblank
+    ldh [rBGPD], a
+    ld a, b
+    ldh [rBGPD], a
+
+    call UpdateMusic
+    xor a
+    ldh [rIF], a
+
+    pop bc
+    dec b
+    jr nz, .fadeout
+    ret
+
+.clear
+    ld hl, Map1
+    ld de, 32 - 20
+    ld b, 18
+.clearloop
+    rept 20
+        ld [hl+], a
+    endr
+    add hl, de
+    dec b
+    jr nz, .clearloop
+    ret
 
 polystream_fill_ramcode_:   MACRO
     ld a, [de]
@@ -770,7 +971,13 @@ PolyStream_ReadPalette:
     ld b, a
     ld a, [hl+]
     ld c, a
-    ld de, wPalTab
+    ld de, wPalTab + 1 _PALETTES
+    ; direct this to fade source instead for fading in
+    ld a, [wDemoState]
+    cp 1 << 1
+    jr nc, .normal
+    ld de, wPalTabTemp + 1 _PALETTES
+.normal
     ld a, 8
 .writecolor
     push af
@@ -908,9 +1115,6 @@ PolyStream_LoadVerts::
     ld [de], a
     ret
 
-; 70224 * 65536 * 100 / 4194304
-CENTISEC_ADD        EQU 109725
-
 PolyStream_VBlankUpdate:
     push af
     push bc
@@ -919,10 +1123,10 @@ PolyStream_VBlankUpdate:
     ld a, [wLoadPal]
     and a
     jr z, .loadpal_done
-    ld a, (1 _PALETTES) | $80
+    ld a, $80
     ldh [rBGPI], a
     ld hl, wPalTab
-    lb bc, 2 _PALETTES, LOW(rBGPD)
+    lb bc, 3 _PALETTES, LOW(rBGPD)
 .loadpal
     ld a, [hl+]
     ldh [c], a
@@ -932,23 +1136,70 @@ PolyStream_VBlankUpdate:
     ld [wLoadPal], a
 .loadpal_done
 
-    ; Update timer tiles
+    call PolyStream_UpdateInfoTiles
+
+    ld a, [wOddFrame]
+    xor 1
+    ld [wOddFrame], a
+    ld a, LCDC_ON | LCDC_WINON | LCDC_BG8000 | LCDC_BGPRIO
+    jr nz, .even
+    ld a, LCDC_ON | LCDC_WINON | LCDC_BG8000 | LCDC_BG9C00 | LCDC_BGPRIO
+.even
+    ldh [rLCDC], a
+
+    ld hl, rIF
+    ; avoid HHDMA firing right after enabling interrupts and miss the timing
+    res IF_TIMER, [hl]
+    ei
+
+    push de
+
+    ; are we fading?
+    ld a, [wDemoState]
+    rra ; bit 0 -> carry
+    jr nc, .notfading
+    call ProcFade
+    ld a, 1
+    ld [wLoadPal], a
+    ld hl, wDemoTimer
+    dec [hl]
+    jr nz, .notfading
+    ; mark fading as done and advance to the next state
+    ld hl, wDemoState
+    inc [hl]
+.notfading
+
+    call UpdateMusic
+
+    pop de
+    pop hl
+    pop bc
+    pop af
+    reti
+.end
+
+PolyStream_UpdateInfoTiles:
     ldh a, [rVBK]
     ld c, a
     xor a
     ldh [rVBK], a
+
+    ld a, [wDemoState]
+    cp 2 << 1
+    jr nc, .noadd
+
     ld hl, wCSecFraction
     ld a, [hl]
-    add LOW(CENTISEC_ADD)
+    add LOW(CENTISEC_ADD_FRAME)
     ld [hl+], a
     ld a, [hl]
-    adc HIGH(CENTISEC_ADD)
+    adc HIGH(CENTISEC_ADD_FRAME)
     ld [hl], a
     ; where the last number is (cs)
     coord hl, 17, 1, PolyStream_TileMapDst
     ld b, 10 ; a bit speedup
     ld a, [hl]
-    adc CENTISEC_ADD >> 16
+    adc CENTISEC_ADD_FRAME >> 16
     cp $fa ; 10
     jr c, .donenum
     sub b
@@ -978,34 +1229,39 @@ PolyStream_VBlankUpdate:
 .donenum
     ld [hl], a
 
+.return
     ld a, c
     ldh [rVBK], a
+    ret
 
-    ld a, [wOddFrame]
-    xor 1
-    ld [wOddFrame], a
-    ; LCD on, win on, win $9800, tile $8000, map $9800, obj off
-    ld a, %10110001
-    jr nz, .even
-    ; LCD on, win on, win $9800, tile $8000, map $9c00, obj off
-    ld a, %10111001
-.even
-    ldh [rLCDC], a
+.noadd
+    ; timer is stopped, animate it a bit by flashing
+    ; where the first number is (m)
+    coord de, 11, 1, PolyStream_TileMapDst
+    ld hl, wDemoTimer
+    inc [hl]
+    bit 5, [hl] ; 32 frames
+    jr z, .show
+.hide
+    ld h, d
+    ld l, e
+    ld a, $ff ; blank
+    rept 7
+        ld [hl+], a
+    endr
+    jr .return
 
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
-    ei
-
-    push de
-    call UpdateMusic
-    pop de
-
-    pop hl
-    pop bc
-    pop af
-    reti
-.end
+.show
+    ld hl, wInfoTilesBuf
+    ; we are not in that tight timing here, so let's just do the normal copy :)
+    ld b, 7
+.copytiles
+    ld a, [hl+]
+    ld [de], a
+    inc de
+    dec b
+    jr nz, .copytiles
+    jr .return
 
 PolyStream_InfoTiles:
     ;  G   B   C  -   N   I   C   C   C

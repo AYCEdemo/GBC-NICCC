@@ -36,6 +36,7 @@ Credits::
     ld de, wStrokeTab ; reuse
     call DecodeWLE
     xor a
+    ldh [rVBK], a
     ld hl, Credits_TileMapDst
     ld bc, 32*18
     rst Fill

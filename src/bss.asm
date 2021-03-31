@@ -23,7 +23,8 @@ wOddFrame::     db
 wClearBuffer::  db
 wUseVertIndex:: db
 wLoadPal::      db
-wPalTab::       ds 8 _COLORS
+wPalTab::       ds 12 _COLORS
+wPalTabTemp::   ds 12 _COLORS
 wVertCount::    db
 wVertTab::      ds 17*2
 wCurColor::     db
@@ -35,6 +36,7 @@ wBoundHeight::
 wMaxY::         db
 wCurRender::    db
 wCSecFraction:: dw
+wInfoTilesBuf:: ds 7 ; m:ss:cc
 wPolyStream_ClearEnd::
 
 ; only 8 palettes for now
@@ -65,6 +67,7 @@ hFraction::     db
 hLoopCnt::      db
 hLoopCnt2::     db
 hLoopReload::   db
+hSavedSP::      db
 
 hIsGBC          EQU $fffe
 EXPORT hIsGBC
