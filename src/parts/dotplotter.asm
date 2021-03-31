@@ -22,9 +22,8 @@ DotPlotter_TotalTime    EQU 17*48
 
 DotPlotter::
     call HHDMA_Install
-	call HHDMA_NoCallback
+    call HHDMA_NoCallback
     di
-
     copycode DotPlotter_VBlankUpdate, VBlankInt
     ei
     call BlackPalette

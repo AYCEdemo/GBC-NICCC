@@ -36,8 +36,7 @@ Main:
     call DotPlotter_Precalc
     call NotGBA
     call DotPlotter
-    call IntroScreens
-	call PolyStream
+    call PolyStream
     jp Credits
 
 DecodeWLE::

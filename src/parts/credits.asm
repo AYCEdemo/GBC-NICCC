@@ -36,6 +36,7 @@ Credits::
     ld de, wStrokeTab ; reuse
     call DecodeWLE
     xor a
+    ldh [rVBK], a
     ld hl, Credits_TileMapDst
     ld bc, 32*18
     rst Fill
@@ -729,19 +730,19 @@ CreditsText:
     db 0
 
     db "2D-GRAPHICS     "
-    db "      DOC / AYCE"
-    db "     NATT / AYCE"
+    db "             DOC"
+    db "            NATT"
     db " TWOFLOWER/TRIAD"
 
     db "DIGITAL MUSIC   "
-    db "    DEVED / AYCE"
-    db "     NATT / AYCE"
-    db "     ZLEW / AYCE"
+    db "           DEVED"
+    db "            NATT"
+    db "            ZLEW"
 
     db "CODING          "
-    db "     NATT / AYCE"
-    db "    DEVED / AYCE"
-    db "   ISSOTM / AYCE"
+    db "            NATT"
+    db "           DEVED"
+    db "          ISSOTM"
 
     db "GB SOUND CODE   "
     db 0
@@ -750,8 +751,8 @@ CreditsText:
 
     db 0
     db 0
-    db "   GREEETINGS..."
-    db 0
+    db "   OUR HEARTS   "
+    db "   GO OUT TO... "
 
     db 0
     db "OXYGENE  LEONARD"
@@ -764,19 +765,15 @@ CreditsText:
     db "  T LOVRS COMITY"
 
     db 0
-    db "DALTON DOX JOKER"
-    db "        PHANTASY"
+    db "DALTON     WERMI"
+    db "AGENDA  PHANTASY"
     db "FAIRLIGHT  TRIAD"
 
-    db 0
-    db 0
     db "  -AYCE 2021-   "
-    db 0
-
-    db 0
     db 0
     db "      CREDITS DO"
     db " THE LOOP NOW..."
+
 .end
 
 Credits_Font:
