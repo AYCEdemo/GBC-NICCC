@@ -436,18 +436,14 @@ PolyStream_DrawLoop:
     ld l, a
     ld a, c
     div8
+    ld e, a
     add HIGH(sRenderBuf)
     ld h, a
-    ld a, [bc]
-    ld e, a
     ld a, d
     div8
-    add HIGH(sRenderBuf)
-    polystream_fill_ramcode_stofs op2 + 1 ; substitution abuse, might break
-    sub h
+    sub e
     jp z, RAMCode + PolyStream_Fill_RAMCode.sametile - PolyStream_Fill_RAMCode
-    dec a
-    jp z, RAMCode + PolyStream_Fill_RAMCode.nointerim - PolyStream_Fill_RAMCode
+    ld e, a
     jp RAMCode
 .ramcodereturn
 
@@ -673,30 +669,9 @@ PolyStream_End:
     ret
 
 PolyStream_Fill_RAMCode:
-    ; a holds number of interim columns
-    push hl ; save starting hl
-    lb bc, $ff, 0
-.interimloop
-    inc h ; move to next column
-.opi_0
-    ld [hl], c
-    inc l
-.opi_1
-    ld [hl], c
-    set 4, h
-.opi_3
-    ld [hl], c
-    dec l
-.opi_2
-    ld [hl], c
-    res 4, h
-    dec a
-    jr nz, .interimloop
-    pop hl
-
-.nointerim
+    ; e holds number of interim columns + 1
     ; starting column
-    ld a, e
+    ld a, [bc]
     ld b, a
     cpl
     ld c, a
@@ -717,10 +692,31 @@ PolyStream_Fill_RAMCode:
 .op0_3
     and c
     ld [hl-], a
+    res 4, h
+    inc h ; move to next column
+
+    dec e
+    jr z, .endcolumn
+    lb bc, $ff, 0
+.interimloop
+.opi_0
+    ld [hl], c
+    inc l
+.opi_1
+    ld [hl], c
+    set 4, h
+.opi_3
+    ld [hl], c
+    dec l
+.opi_2
+    ld [hl], c
+    res 4, h
+    inc h
+    dec e
+    jr nz, .interimloop
 
     ; ending column
-.op2
-    ld h, 0
+.endcolumn
     ld b, HIGH(StartPixelTable)
     ld c, d
     ld a, [bc]
@@ -730,6 +726,8 @@ PolyStream_Fill_RAMCode:
     jr .draw
 
 .sametile
+    ld a, [bc]
+    ld e, a
     ld c, d
     ld a, [bc]
     xor e
