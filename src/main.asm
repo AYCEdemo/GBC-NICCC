@@ -28,24 +28,14 @@ Main:
     ld de, Inst_chcknbnk
     call Music_PrepareInst
     ld bc, BANK(Music_chcknbnk)
-    ld de, Music_chcknbnk+4*4
+    ld de, Music_chcknbnk
     call Music_Play
     call SoundSystem_Process
 
-    ; TEMP skip music
-    ld a, 7*60/2
-.tmploop
-    push af
-    call SoundSystem_Process
-    call SoundSystem_Process
-    pop af
-    dec a
-    jr nz, .tmploop
-
     ; demo parts
-    ; call DotPlotter_Precalc
-    ; call NotGBA
-    ; call DotPlotter
+    call DotPlotter_Precalc
+    call NotGBA
+    call DotPlotter
     call PolyStream
     jp Credits
 

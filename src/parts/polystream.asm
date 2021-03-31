@@ -201,17 +201,19 @@ PolyStream_FindMinMax:
     ; divide x by 8 for tiles
     ld hl, wMinX
     ld a, [hl]
-    srl a
-    srl a
-    srl a
+    rrca
+    rrca
+    rrca
+    and $1f
     ld [hl+], a
     ld b, a
     ld a, [hl] ; wMaxX
     ; inc a ; adjust for end pos
     ; dec a ; ceil
-    srl a
-    srl a
-    srl a
+    rrca
+    rrca
+    rrca
+    and $1f
     inc a
     sub b
     ; sanity check from coordinate division: width is 0
@@ -325,17 +327,15 @@ PolyStream_Stroke:
     cp 100
     ; no need to stroke if it's always outside the display :)
     jp nc, .pixdone
-    ld a, b
-    and %00000111
-    add LOW(OnePixelTable)
-    ld l, a
+    ld l, b
     ld h, HIGH(OnePixelTable)
     ld e, [hl]
     ld l, c
     ld a, b
-    srl a
-    srl a
-    srl a
+    rrca
+    rrca
+    rrca
+    and $f
     add HIGH(wStrokeTab)
     ld h, a
     inc d ; also stroke the ending pixel
@@ -416,18 +416,16 @@ PolyStream_Stroke:
     ld d, a
 .positive
     ; calculate starting address and pixel
-    ld a, b
-    and %00000111
-    add LOW(OnePixelTable)
-    ld l, a
+    ld l, b
     ld h, HIGH(OnePixelTable)
     ld a, [hl]
     ldh [hFraction], a ; temp
     ld l, c
     ld a, b
-    srl a
-    srl a
-    srl a
+    rrca
+    rrca
+    rrca
+    and $f
     add HIGH(wStrokeTab)
     ld h, a
 
@@ -1051,7 +1049,7 @@ PolyStream_ReadVertArray::
     ld b, a
     ld de, wVertArrayX
 .loop
-    ld a, [hl+] ; x posas
+    ld a, [hl+] ; x pos
     srl a ; /2
     ld [de], a
     inc d ; wVertArrayY
