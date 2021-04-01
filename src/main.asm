@@ -28,7 +28,7 @@ Main:
     ld de, Inst_chcknbnk
     call Music_PrepareInst
     ld bc, BANK(Music_chcknbnk)
-    ld de, Music_chcknbnk+4*4
+    ld de, Music_chcknbnk
     call Music_Play
     call SoundSystem_Process
 
