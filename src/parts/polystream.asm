@@ -797,7 +797,7 @@ PolyStream_HHDMACallback:
     add HIGH(sRenderBuf)
     ld h, a
     ld l, LOW(sRenderBuf)
-    lb bc, 13, 7
+    lb bc, 13, 5
     call HHDMA_Transfer
     ld hl, wCurRender
     inc [hl]
