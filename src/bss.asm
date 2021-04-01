@@ -9,7 +9,7 @@ ENDM
     buf VBlankInt, $80
     buf LCDInt,    $80
     buf TimerInt,  $80
-    buf RAMCode,   $100
+    buf RAMCode,   $80
 
 ; bit 0 = running
 ; bit 1 = has callback
@@ -44,6 +44,7 @@ wFadeTargets::  ds 8 * 4 * 3
 wFadeDestPtr::  dw
 wFadeCount::    db
 wFadeStep::     db
+wPalTabLarge::  ds 32 _COLORS
 
 SECTION "Aligned Variables", WRAM0, ALIGN[8]
 wVertArrayX::   ds $100
@@ -55,6 +56,9 @@ sRenderBuf2:    ds 16*256
 
 SECTION "Stroke Table", WRAMX, ALIGN[8]
 wStrokeTab::    ds 16*256
+
+SECTION "OAMDMA code", HRAM
+OAMDMA::        ds 8
 
 SECTION "High RAM", HRAM
 HHDMA_Count::           db

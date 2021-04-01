@@ -61,6 +61,9 @@ Credits::
     ld a, 1
     ldh [rVBK], a
     xor a
+    ld hl, Credits_TileDataDst
+    ld bc, $1000
+    rst Fill
     ld hl, Credits_TileMapDst
     ld bc, 32*20
     rst Fill

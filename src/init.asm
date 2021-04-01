@@ -48,6 +48,15 @@ Init:
     ldh [rKEY1], a
     stop ; switch to double speed
 
+    ld hl, OAMDMA_
+    lb bc, OAMDMA_.end - OAMDMA_, LOW(OAMDMA)
+.copyoamdma
+    ld a, [hl+]
+    ld [c], a
+    inc c
+    dec b
+    jr nz, .copyoamdma
+
     ei
     jp Main
 
@@ -82,6 +91,15 @@ NotGBC:
 .loop
     halt
     jr .loop
+
+OAMDMA_:
+    ldh [rDMA], a
+    ld a, $28
+.wait
+    dec a
+    jr nz, .wait
+    ret
+.end
 
 SECTION "Not GBC Graphics", ROMX
 NotGBCTiles:    INCBIN "data/gfx/notgbc.2bpp"

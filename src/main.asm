@@ -196,6 +196,20 @@ SetFadeFromWhite::
     ld de, wFadeTargets
     jp SetFadeCommon2
 
+SetFadeToBlack::
+    call SetFadeCommon
+    xor a
+    ld bc, wFadeTargets
+    ld de, wFadeCurrents
+    jp SetFadeCommon2
+
+SetFadeFromBlack::
+    call SetFadeCommon
+    xor a
+    ld bc, wFadeCurrents
+    ld de, wFadeTargets
+    jp SetFadeCommon2
+
 SetFadeCommon:
     ld a, e
     ld [wFadeDestPtr], a

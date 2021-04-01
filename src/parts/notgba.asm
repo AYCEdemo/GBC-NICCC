@@ -23,6 +23,9 @@ NotGBA::
     ld [NotGBA_Timer+1], a
     ld a, 1
     ld [NotGBA_DoTech], a
+    ld a, BANK(NotGBASine)
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
 
     ld hl, NotGBATiles
     ld de, Tileset1
@@ -61,7 +64,7 @@ NotGBA_ScreenSlideIn:
     ldh a, [rWY]
     add 6
     ldh [rWY], a
-    call SoundSystem_Process
+    call UpdateMusic
     ldh a, [rWY]
     cp 144 ; 24 frames
     jr c, NotGBA_ScreenSlideIn
@@ -88,7 +91,7 @@ NotGBA_MainLoop:
     and a
     jr z, .waitvblank
 
-    call SoundSystem_Process
+    call UpdateMusic
 
     ld hl, NotGBA_FrameCount
     ld a, [hl+]
@@ -142,7 +145,7 @@ NotGBA_ScreenSlide:
     ldh a, [rWY]
     add 6
     ldh [rWY], a
-    call SoundSystem_Process
+    call UpdateMusic
     ldh a, [rWY]
     cp 144 ; 24 frames
     jr c, NotGBA_ScreenSlide
@@ -201,13 +204,12 @@ LCDInt_NotGBA:
     reti
 .end
 
-SECTION "Not GBA Screen - Sine table", ROM0
+SECTION "Not GBA Screen - Graphics data", ROMX
 NotGBASine:     INCBIN "data/notgba_sine.bin"
 
-SECTION "Not GBA Screen - Graphics data", ROM0
 NotGBATiles:    INCBIN "data/gfx/notgba.2bpp.wle"
 
-NotGBAMap:      INCBIN "data/gfx/notgbamap.bin"
+NotGBAMap:      INCBIN "data/gfx/notgba_map.bin"
 NotGBAMap_End:
 
 NotGBAPal:

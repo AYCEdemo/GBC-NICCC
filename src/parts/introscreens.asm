@@ -6,23 +6,34 @@ SECTION "Intro screens - Code", ROM0
 IntroScreens::
 
 GBCNICCCScreen:
-    ; LCD isn't disabled so do that first
-    halt
-    xor     a
-    ldh     [rLCDC],a
-    ldh     [rVBK],a
+    ; No, I don't want white flashes :P
+    call HHDMA_NoCallback
     di
+    xor     a
+    ldh     [rVBK],a
+    ld      [IntroScreen_CurOAMBuffer],a
+    ld      hl,wPalTabLarge
+    ld      bc,6 _PALETTES
+    rst     Fill
     ld      a,IntroScreen_WaitTime
     ld      [IntroScreen_Timer],a
-    
+    copycode    IntroScreens_VBlank,VBlankInt
+    ei
+
+    call    BlackPalette
     ld      a,bank(GBCNICCCTiles)
     ldh     [hCurBank],a
     ld      [MBC5RomBankLo],a
-    
+
     ld      hl,GBCNICCCTiles
-    ld      de,Tileset1
+    ld      de,sRenderBuf
     call    DecodeWLE
-    
+    call    DecodedWLESize2HHDMATiles
+    ld      hl,sRenderBuf
+    ld      de,Tileset1
+    ld      c,8
+    call    HHDMA_Transfer
+
     ld      hl,IntroScreen_OAMBufferOdd
     ld      bc,40*4
     xor     a
@@ -31,7 +42,7 @@ GBCNICCCScreen:
     ld      bc,40*4
     xor     a
     rst     Fill
-    
+
     ld      hl,AYCE_OAMOdd
     ld      de,IntroScreen_OAMBufferOdd
     ld      bc,AYCE_OAMOdd.end-AYCE_OAMOdd
@@ -40,185 +51,227 @@ GBCNICCCScreen:
     ld      de,IntroScreen_OAMBufferEven
     ld      bc,AYCE_OAMEven.end-AYCE_OAMEven
     rst     Copy
-    
-    ld      hl,GBCNICCCMap
-    ld      bc,GBCNICCCMap_End-GBCNICCCMap
-    ld      de,Map1
-    push    de
-    rst     Copy
 
+    call    HHDMA_Wait
+    ld      hl,GBCNICCCMap
+    ld      de,Map1
+    lb      bc,(GBCNICCCMap.end-GBCNICCCMap)>>4,8
+    call    HHDMA_Transfer
+
+    call    HHDMA_Wait
     ld      a,1
     ldh     [rVBK],a
     ld      hl,GBCNICCCAttr
-    ld      bc,GBCNICCCAttr_End-GBCNICCCAttr
-    pop     de
-    rst     Copy
+    ld      de,Map1
+    lb      bc,(GBCNICCCAttr.end-GBCNICCCAttr)>>4,8
+    call    HHDMA_Transfer
 
     ld      hl,GBCNICCCPal
-    ld      a,%10000000 | 0 ; palette index 0, auto-increment
-    ldh     [rBGPI],a
-    ld      c,LOW(rBGPD)
-    rept (4 _COLORS) * 4 ; 4 palettes to load
-        ld      a,[hl+]
-        ldh     [c],a
-    endr
+    ld      de,wPalTabLarge
+    lb      bc,1,4*4
+    call    SetFadeFromBlack
 
     xor     a
     ldh     [rSCX],a
     ldh     [rSCY],a
     
-    copycode    GBCNICCC_VBlank,VBlankInt    
-    
     ld      a,LCDC_ON | LCDC_BG8000
     ldh     [rLCDC],a
-    ld      a,(1 << IF_VBLANK)
-    ldh     [rIE],a
     ei
 
 GBCNICCCScreen_MainLoop:
     halt
-    ld      hl,IntroScreen_Timer
-    dec     [hl]
-    jr      nz,GBCNICCCScreen_MainLoop
-    
-    
+    ld      a,[wOddFrame]
+    ld      b,a
+    ld      a,[IntroScreen_Timer]
+    ld      c,a
+    or      b
+    jr      z,.done
+    ld      a,c
+    cp      20
+    jr      z,.setfade
+    jr      c,.procfade
+    cp      IntroScreen_WaitTime-4
+    jr      nc, GBCNICCCScreen_MainLoop
+    cp      IntroScreen_WaitTime-20
+    jr      c,GBCNICCCScreen_MainLoop
+    jr      .procfade
+.setfade
+    srl     b
+    jr      c, .procfade ; odd frame, fade already set
+    ld      hl,GBCNICCCPal
+    ld      de,wPalTabLarge
+    lb      bc,1,4*4
+    call    SetFadeToBlack
+    ld      a, 1
+.procfade
+    ld      [wLoadPal],a
+    call    ProcFade
+    jr      GBCNICCCScreen_MainLoop
+.done
+
 AYCEScreen:
-    halt
-    xor     a
-    ldh     [rLCDC],a
-    ldh     [rVBK],a
     di
+    xor     a
+    ldh     [rVBK],a
     ld      a,IntroScreen_WaitTime
     ld      [IntroScreen_Timer],a
+    ld      a,high(IntroScreen_OAMBufferEven)
+    ld      [IntroScreen_CurOAMBuffer],a
+    copycode    IntroScreens_VBlank,VBlankInt
+    ei
 
     ld      hl,AYCEBGTiles
+    ld      de,sRenderBuf
+    call    DecodeWLE
+    call    DecodedWLESize2HHDMATiles
+    ld      hl,sRenderBuf
     ld      de,Tileset2
-    call    DecodeWLE
+    ld      c,8
+    call    HHDMA_Transfer
     
+    call    HHDMA_Wait
     ld      hl,AYCESprTiles
-    ld      de,Tileset1
+    ld      de,sRenderBuf
     call    DecodeWLE
+    call    DecodedWLESize2HHDMATiles
+    ld      hl,sRenderBuf
+    ld      de,Tileset1
+    ld      c,8
+    call    HHDMA_Transfer
     
-    xor     a
-    ld      hl,Map1
-    ld      bc,Map2-Map1
+    call    HHDMA_Wait
+    ld      a,$7f
+    ld      hl,sRenderBuf
+    ld      bc,32*19
     push    hl
     push    bc
     rst     Fill
     
     ld      hl,AYCEMap
-    ld      bc,AYCEMap_End-AYCEMap
-    ld      de,Map1
-    push    de
+    ld      bc,AYCEMap.end-AYCEMap
+    coord   de,0,3,sRenderBuf
     rst     Copy
-    
-    ld      a,1
-    ldh     [rVBK],a
-    pop     de
+
+    ld      hl,sRenderBuf
+    ld      de,Map1
+    lb      bc,(32*19)>>4,8
+    call    HHDMA_Transfer
+
+    call    HHDMA_Wait
     pop     bc
     pop     hl
-    ld      a,$6d
+    xor     a
     rst     Fill
-    
+
+    ; Clear tile 0:17f for border
+    ld      hl,sRenderBuf ; should contain zeros
+    ld      de,$97f0
+    lb      bc,1,1
+    call HHDMA_Transfer
+
+    call    HHDMA_Wait
     ld      hl,AYCEAttr
-    ld      bc,AYCEAttr_End-AYCEAttr
-    ld      de,Map1
+    ld      bc,AYCEAttr.end-AYCEAttr
+    coord   de,0,3,sRenderBuf
     rst     Copy
-        
-    copycode    AYCE_VBlank,OAMDMA
-    ld      hl,VBlankInt
-    ld      a,$c3   ; opcode for jp
-    ld      [hl+],a
-    ld      a,low(OAMDMA)
-    ld      [hl+],a
-    ld      a,high(OAMDMA)
-    ld      [hl],a
+
+    ld      a,1
+    ldh     [rVBK],a
+    ld      hl,sRenderBuf
+    ld      de,Map1
+    lb      bc,(32*19)>>4,8
+    call    HHDMA_Transfer
     
     ld      hl,AYCE_BGPal
-    ld      a,%10000000 | 0 ; palette index 0, auto-increment
-    ldh     [rBGPI],a
-    ld      c,LOW(rBGPD)
-    rept (4 _COLORS) * 4 ; 4 palettes to load
-        ld      a,[hl+]
-        ldh     [c],a
-    endr
-    ld      hl,AYCE_OBJPal
-    ld      a,%10000000 | 0 ; palette index 0, auto-increment
-    ldh     [rOBPI],a
-    ld      c,LOW(rOBPD)
-    rept (4 _COLORS) * 2 ; 2 palettes to load
-        ld      a,[hl+]
-        ldh     [c],a
-    endr
+    ld      de,wPalTabLarge
+    lb      bc,1,6*4
+    call    SetFadeFromBlack
 
     xor     a
     ldh     [rSCX],a
-    ld      a,-23
+    ld      a,2
     ldh     [rSCY],a
     
     ld      a,LCDC_ON | LCDC_OBJON | LCDC_OBJSIZE
     ldh     [rLCDC],a
-    ld      a,(1 << IF_VBLANK)
-    ldh     [rIE],a
-    ei
 
 AYCEScreen_MainLoop:
     halt
+    ld      a,[wOddFrame]
+    ld      b,a
+    ld      a,[IntroScreen_Timer]
+    ld      c,a
+    or      b
+    ret     z ; done
+    ld      a,c
+    cp      IntroScreen_WaitTime-4
+    jr      nc, AYCEScreen_MainLoop
+    cp      IntroScreen_WaitTime-20
+    jr      c,AYCEScreen_MainLoop
+.procfade
+    ld      [wLoadPal],a
+    call    ProcFade
+    jr      AYCEScreen_MainLoop
+
+DecodedWLESize2HHDMATiles:
+    ; assuming the destination was aligned to $1000 bytes
+    ; de holds last address after DecodeWLE
+    ld      a,e
+    swap    a
+    and     $0f
+    ld      b,a
+    ld      a,d
+    swap    a
+    and     $f0
+    or      b
+    ld      b,a
+    ret
+
+IntroScreens_VBlank:
+    push    af
+    push    bc
+    push    de
+    push    hl
+
+    ld      a,[wLoadPal]
+    and     a
+    jr      z,.loadpal_done
+    ld      a,$80
+    ldh     [rBGPI],a
+    ldh     [rOBPI],a
+    ld      hl,wPalTabLarge
+    lb      bc,4 _PALETTES,LOW(rBGPD)
+.loadpal
+    ld      a,[hl+]
+    ldh     [c],a
+    dec     b
+    jr      nz,.loadpal
+    lb      bc,2 _PALETTES,LOW(rOBPD)
+.loadpal2
+    ld      a,[hl+]
+    ldh     [c],a
+    dec     b
+    jr      nz,.loadpal2
+    xor     a
+    ld      [wLoadPal],a
+.loadpal_done
+
+    ld      a,[IntroScreen_CurOAMBuffer]
+    and     a
+    jr      z,.skip
+    xor     high(IntroScreen_OAMBufferEven^IntroScreen_OAMBufferOdd)
+    ld      [IntroScreen_CurOAMBuffer],a
+    call    OAMDMA
+.skip
+    call    UpdateMusic
+    ld      a,[wOddFrame]
+    xor     1
+    ld      [wOddFrame],a
+    jr      nz,.odd
     ld      hl,IntroScreen_Timer
     dec     [hl]
-    push    af
-    ld      a,[hl]
-    rrca
-    jr      nc,.even
 .odd
-    ld      a,high(IntroScreen_OAMBufferOdd)
-    jr      .continue
-.even
-    ld      a,high(IntroScreen_OAMBufferEven)
-    ; fall through
-.continue
-    ldh     [OAMDMA+((AYCE_VBlank.bufloc-AYCE_VBlank)+1)],a
-    pop     af
-    jr      nz,AYCEScreen_MainLoop
-    xor     a
-    ldh     [rLCDC],a
-    di
-    
-    ; temp hack to stop freezing on exit
-    ld      hl,HHDMA_Status
-    res     0,[hl]
-    ret ; done
-
-GBCNICCC_VBlank:
-    push    af
-    push    bc
-    push    de
-    push    hl
-    call    SoundSystem_Process
-    ld      a,[hCurBank]
-    ld      [MBC5RomBankLo],a
-    pop     hl
-    pop     de
-    pop     bc
-    pop     af
-    reti
-.end
-
-AYCE_VBlank:
-    push    af
-    push    bc
-    push    de
-    push    hl
-    call    SoundSystem_Process
-    ld      a,[hCurBank]
-    ld      [MBC5RomBankLo],a
-.bufloc
-    ld      a,high(IntroScreen_OAMBufferOdd)
-    ld      [rDMA],a
-    ld      a,$28
-.wait
-    dec     a
-    jr      nz,.wait
     pop     hl
     pop     de
     pop     bc
@@ -228,20 +281,26 @@ AYCE_VBlank:
 
 ; ================
 
+SECTION "Intro screens - Aligned Graphics data", ROMX, ALIGN[4]
+GBCNICCCMap:        INCBIN "data/gfx/gbcniccc_map.bin"
+.end
+GBCNICCCAttr:       INCBIN "data/gfx/gbcniccc_attr.bin"
+.end
+
+AYCEMap:            INCBIN "data/gfx/ayce_map.bin"
+.end
+AYCEAttr:           INCBIN "data/gfx/ayce_attr.bin"
+.end
+
 SECTION "Intro screens - Graphics data", ROMX
 GBCNICCCTiles:      INCBIN "data/gfx/gbcniccc.2bpp.wle"
-GBCNICCCMap:        INCBIN "data/gfx/gbcnicccmap.bin"
-GBCNICCCMap_End:
-GBCNICCCAttr:       INCBIN "data/gfx/gbcniccc.atr"
-GBCNICCCAttr_End:
+.end
 GBCNICCCPal:        INCBIN "data/gfx/gbcniccc.pal"
 
 AYCEBGTiles:        INCBIN "data/gfx/ayce_bg.2bpp.wle"
+.end
 AYCESprTiles:       INCBIN "data/gfx/ayce_spr.2bpp.wle"
-AYCEMap:            INCBIN "data/gfx/ayce_map.bin"
-AYCEMap_End:
-AYCEAttr:           INCBIN "data/gfx/ayce_attr.bin"
-AYCEAttr_End:
+.end
 
 AYCE_OAMOdd:
     ; line 0
@@ -306,8 +365,7 @@ AYCE_BGPal:
     color  0,  4,  8
     color  5,  4,  0
     color 12,  8,  0
-
-AYCE_OBJPal:
+    ds 8, 0
     color  0,  0,  0
     color 17, 12,  0
     color 25, 17,  0
@@ -322,14 +380,11 @@ AYCE_OBJPal:
 SECTION "Intro screens - RAM", WRAM0
 
 IntroScreen_Timer:          db
+IntroScreen_CurOAMBuffer:   db
 
 SECTION "Intro screens - Odd OAM buffer", WRAM0, ALIGN[8]
 IntroScreen_OAMBufferOdd:   ds  40*4
 SECTION "Intro screens - Even OAM buffer", WRAM0, ALIGN[8]
 IntroScreen_OAMBufferEven:  ds  40*4
 
-IntroScreen_WaitTime        EQU 3*60 ; time (in frames) to wait before next screen
-
-section "Intro screens - HRAM", HRAM
-OAMDMA_SIZE     EQU AYCE_VBlank.end-AYCE_VBlank
-OAMDMA:         ds  OAMDMA_SIZE
+IntroScreen_WaitTime        EQU 17*9 ; time (in 2 frames) to wait before next screen
