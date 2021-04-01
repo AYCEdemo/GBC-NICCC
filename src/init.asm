@@ -17,7 +17,7 @@ Init:
     ld [VBlankInt], a
     ld [LCDInt], a
     ld [TimerInt], a
-    ld a, [rLCDC]
+    ldh a, [rLCDC]
     add a ; bit 7 -> carry
     jr nc, .nowait
 .waitvb

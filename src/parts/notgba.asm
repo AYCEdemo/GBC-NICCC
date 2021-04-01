@@ -176,7 +176,7 @@ LCDInt_NotGBA:
     ld c, a
     ld hl, NotGBASine
     add hl, bc
-    ld a, [rLY]
+    ldh a, [rLY]
     ld c, a
     ld b, 0
     add hl, bc

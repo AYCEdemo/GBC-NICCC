@@ -29,14 +29,23 @@ Credits::
     copycode Credits_VBlankUpdate, VBlankInt
     call LCDOff
 
+    xor a
+    ldh [rVBK], a
+    ld a, $80
+    ldh [rBGPI], a
+    ld a, $ff
+    ld hl, wPalTab
+    ld c, LOW(rBGPD)
+    rept 4 _COLORS
+        ldh [c], a
+    endr
+
     ld a, BANK(Credits_Font)
     ldh [hCurBank], a
     ld [MBC5RomBankLo], a
     ld hl, Credits_Font
     ld de, wStrokeTab ; reuse
     call DecodeWLE
-    xor a
-    ldh [rVBK], a
     ld hl, Credits_TileMapDst
     ld bc, 32*18
     rst Fill

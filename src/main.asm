@@ -38,6 +38,7 @@ Main:
     call DotPlotter
     call IntroScreens
     call PolyStream
+    call PostScreen
     jp Credits
 
 DecodeWLE::

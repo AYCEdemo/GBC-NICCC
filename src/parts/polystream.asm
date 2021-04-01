@@ -581,9 +581,8 @@ PolyStream_End:
 .donenum
     ld [hl], a
 
-    ; TODO pause according to music sync byte
     call HHDMA_Wait
-    xor a ; 256 frames
+    ld a, 256 - 16
 .delay
     halt
     dec a
