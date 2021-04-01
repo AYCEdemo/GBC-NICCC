@@ -32,20 +32,11 @@ Main:
     call Music_Play
     call SoundSystem_Process
 
-    ; TEMP skip music
-    ld a, 7*60/2
-.tmploop
-    push af
-    call SoundSystem_Process
-    call SoundSystem_Process
-    pop af
-    dec a
-    jr nz, .tmploop
-
     ; demo parts
-    ; call DotPlotter_Precalc
-    ; call NotGBA
-    ; call DotPlotter
+    call DotPlotter_Precalc
+    call NotGBA
+    call DotPlotter
+    call IntroScreens
     call PolyStream
     jp Credits
 
