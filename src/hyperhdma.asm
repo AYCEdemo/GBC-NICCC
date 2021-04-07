@@ -92,9 +92,6 @@ HHDMA_Transfer::
     ; start HHDMA transfer from hl to de for b*16 bytes
     ; at a rate of c*16 bytes per line
     ; hl and de must be 16 bytes aligned per HDMA's requirements
-    ld a, [HHDMA_Status]
-    set 0, a
-    ld [HHDMA_Status], a
     ld a, h
     ldh [rHDMA1], a
     ld a, l
@@ -119,6 +116,9 @@ HHDMA_Transfer::
     dec a ; adjust for HDMA5's length - 1
     ldh [HHDMA_NextTransfer], a
     di
+    ; set status to active
+    ld hl, HHDMA_Status
+    set 0, [hl]
     ; enable timer interrupt
     ld hl, rIE
     set IF_TIMER, [hl]
@@ -180,9 +180,68 @@ HHDMA_Interrupt:
     ; let interrupts happen just in case the callback function needs it
     ; especially those that calls HHDMA_Transfer again
     ei
-.callback
-    call 0
+    call HHDMA_CallbackAddress - 1
     pop de
     pop bc
     jr .finish_done
+
+.callback
+    jp 0
 .end
+
+HHDMA_Interrupt_VBlank::
+    ; called from vblank handler to take advantage of a bigger window
+    ; since it enable interrupts for callback, this should be called
+    ; last among timing-sensitive codes
+    ; modifies af, bc, hl
+    ; c = maximum tiles (max 128 due to rHDMA5 limitaion)
+    ld a, [HHDMA_Status]
+    rra ; bit 0 -> carry
+    ret nc ; not running
+
+    dec c ; turn into count - 1
+    ldh a, [HHDMA_NextTransfer]
+    ld b, a
+    ldh a, [HHDMA_Count]
+    add b ; should hold actual remaining - 1
+    ld l, a
+    cp c
+    jr c, .less
+    ld a, c
+.less
+    ldh [rHDMA5], a ; transfer
+    ldh a, [HHDMA_PerLine]
+    ld b, a
+    ld a, l
+    sub c
+    jr c, .finish
+    jr z, .finish
+    cp b
+    jr nc, .remain
+.last
+    ld b, a
+.remain
+    sub b
+    ldh [HHDMA_Count], a
+    ld a, b
+    dec a
+    ldh [HHDMA_NextTransfer], a
+    ld hl, rIF
+    ; avoid HHDMA firing right after enabling interrupts and miss the timing
+    res IF_TIMER, [hl]
+    ret
+
+.finish
+    ld hl, rIE
+    res IF_TIMER, [hl] ; no more timer interrupts
+    ld hl, rIF
+    res IF_TIMER, [hl]
+    ld hl, HHDMA_Status
+    res 0, [hl] ; done
+    bit 1, [hl] ; has callback?
+    ret z
+    push de
+    ei
+    call HHDMA_CallbackAddress - 1
+    pop de
+    ret

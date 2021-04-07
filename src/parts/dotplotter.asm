@@ -579,13 +579,12 @@ DotPlotter_VBlankUpdate:
     ld [wLoadPal], a
 .loadpal_done
 
+    ld c, 128
+    call HHDMA_Interrupt_VBlank
+    ei
+
     call DotPlotter_UpdateTimerAndFade
     call DotPlotter_UpdateCamera
-
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
-    ei
 
     push de
     call UpdateMusic

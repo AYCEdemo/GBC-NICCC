@@ -398,9 +398,9 @@ PolyStream_DrawLoop:
     ; weirdly placed here to minimize wait time until
     ; the last render buffer transfer is completed
     ld a, [HHDMA_Status]
-    bit 0, a
+    rra ; bit 0 -> carry
     ; do the check beforehand to prevent wasting cycles calling this
-    call nz, HHDMA_Wait
+    call c, HHDMA_Wait
     ld a, [wClearBuffer]
     and a
     jp z, .clearbufferskip
@@ -797,6 +797,8 @@ PolyStream_HHDMACallback:
     add HIGH(sRenderBuf)
     ld h, a
     ld l, LOW(sRenderBuf)
+    ; transfers per line could be 8, but the real hardware doesn't
+    ; like GDMA on mode 2 for some reason, needs research
     lb bc, 13, 5
     call HHDMA_Transfer
     ld hl, wCurRender
@@ -1035,9 +1037,8 @@ PolyStream_VBlankUpdate:
 .even
     ldh [rLCDC], a
 
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
+    ld c, 128
+    call HHDMA_Interrupt_VBlank
     ei
 
     push de

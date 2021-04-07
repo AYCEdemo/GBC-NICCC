@@ -700,9 +700,8 @@ Credits_VBlankUpdate:
     ld [wLoadPal], a
 .loadpal_done
 
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
+    ld c, 128
+    call HHDMA_Interrupt_VBlank
     ei
 
     call UpdateMusic
