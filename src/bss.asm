@@ -52,7 +52,7 @@ wVertArrayY::   ds $100
 
 SECTION "Render Buffer", SRAM, ALIGN[8]
 sRenderBuf::    ds 16*256
-sRenderBuf2:    ds 16*256
+sRenderBuf2::   ds 16*256
 
 SECTION "Stroke Table", WRAMX, ALIGN[8]
 wStrokeTab::    ds 16*256

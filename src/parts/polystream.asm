@@ -155,6 +155,7 @@ PolyStream::
     ; This part starts with fade from white, yaay
     call LCDOff
     copycode PolyStream_VBlankUpdate, VBlankInt
+    copycode PolyStream_LCDUpdate, LCDInt
 
     ld a, $80
     ldh [rBGPI], a
@@ -182,7 +183,7 @@ PolyStream::
     rst Fill
 
     ld hl, PolyStream_InfoTileData
-    ld de, PolyStream_TileDataDst + $e9 _TILES
+    ld de, PolyStream_TileDataDst + $109 _TILES
     call DecodeWLE
     ld a, $ff
     ld hl, PolyStream_TileMapDst
@@ -226,7 +227,8 @@ PolyStream::
     ldh [rWX], a
     ld a, 100+16
     ldh [rWY], a
-    ld a, (1 << IF_VBLANK)
+    ldh [rLYC], a
+    ld a, (1 << IF_VBLANK) | (1 << IF_LCD_STAT)
     ldh [rIE], a
     xor a
     ldh [rIF], a
@@ -234,6 +236,8 @@ PolyStream::
     call HHDMA_Install
     ld hl, PolyStream_HHDMACallback
     call HHDMA_SetCallback
+    ld a, STAT_LYC
+    ldh [rSTAT], a
 
 .waitvb
     ldh a, [rLY]
@@ -582,14 +586,22 @@ PolyStream_End:
     ld [hl], a
 
     call HHDMA_Wait
-    ld a, 256 - 16
+    ld b, 256 - 16
 .delay
     halt
-    dec a
+    ; make sure it's actually VBlank
+    ld a, [rLY]
+    cp 144
+    jr c, .delay
+    dec b
     jr nz, .delay
 
     ; I'm too lazy to write another VBlank routine for this
     di
+    ld a, (1 << IF_VBLANK)
+    ldh [rIE], a
+    xor a
+    ldh [rIF], a
     ld a, $80
     ldh [rBGPI], a
     xor a
@@ -773,44 +785,23 @@ _x = _x + 1
 
 PolyStream_HHDMACallback:
     ld a, [wCurRender]
-    cp 32
+    cp 2
     ret z ; we're done
 
-    ld c, a
-    and 15
-    add a
-    add LOW(.dests)
-    ld l, a
-    adc HIGH(.dests)
-    sub l
-    ld h, a
-    ld a, [hl+]
-    ld d, [hl]
-    ld e, a
-    xor a
-    bit 4, c ; >= 16?
-    jr z, .loadbank0
-    inc a
-.loadbank0
-    ldh [rVBK], a
-    ld a, c
-    add HIGH(sRenderBuf)
-    ld h, a
-    ld l, LOW(sRenderBuf)
+    ldh [rVBK], a ; doubles as vram bank too
+    ld hl, sRenderBuf
+    and a
+    jr z, .bank0
+    ld h, HIGH(sRenderBuf2)
+.bank0
+    ld de, PolyStream_TileDataDst
     ; transfers per line could be 8, but the real hardware doesn't
     ; like GDMA on mode 2 for some reason, needs research
-    lb bc, 13, 5
+    lb bc, 15*16+13, 5
     call HHDMA_Transfer
     ld hl, wCurRender
     inc [hl]
     ret
-
-.dests
-_x = PolyStream_TileDataDst
-    rept 16
-        dw _x
-_x = _x + 104 * 2
-    endr
 
 PolyStream_SetTiles:
     xor a
@@ -821,12 +812,12 @@ PolyStream_SetTiles:
     push hl
 .settiles2
     ld [hl+], a
-    add 13
+    add 16
     dec c
     jr nz, .settiles2
     pop hl
     add hl, de
-    sub 16 * 13 - 1
+    sub 16 * 16 - 1
     dec b
     jr nz, .settiles
     ret
@@ -1067,6 +1058,14 @@ PolyStream_VBlankUpdate:
     reti
 .end
 
+PolyStream_LCDUpdate:
+    push af
+    ld a, LCDC_ON | LCDC_WINON | LCDC_BGPRIO
+    ldh [rLCDC], a
+    pop af
+    reti
+.end
+
 PolyStream_UpdateInfoTiles:
     ldh a, [rVBK]
     ld c, a
@@ -1089,26 +1088,26 @@ PolyStream_UpdateInfoTiles:
     ld b, 10 ; a bit speedup
     ld a, [hl]
     adc CENTISEC_ADD_FRAME >> 16
-    cp $fa ; 10
+    cp $1a ; 10
     jr c, .donenum
     sub b
     ld [hl-], a
     ld a, [hl] ; ds
     inc a
-    cp $fa
+    cp $1a
     jr c, .donenum
     sub b
     ld [hl-], a
     dec hl ; .
     ld a, [hl] ; s
     inc a
-    cp $fa
+    cp $1a
     jr c, .donenum
     sub b
     ld [hl-], a
     ld a, [hl] ; 10s
     inc a
-    cp $f6
+    cp $16
     jr c, .donenum
     sub 6
     ld [hl-], a
@@ -1154,9 +1153,9 @@ PolyStream_UpdateInfoTiles:
 
 PolyStream_InfoTiles:
     ;  G   B   C  -   N   I   C   C   C
-    db $e9, $ea, $eb, $ec, $ed, $ee, $ef, $ff
+    db $09, $0a, $0b, $0c, $0d, $0e, $0f, $ff
     ;        0    :    0    0    .    0    0
-    db $ff, $f0, $fa, $f0, $f0, $fb, $f0, $f0
+    db $ff, $10, $1a, $10, $10, $1b, $10, $10
 
 PolyStream_InfoTileData:    INCBIN "data/gfx/numbers.2bpp.wle"
 
