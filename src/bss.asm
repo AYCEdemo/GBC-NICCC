@@ -66,6 +66,7 @@ HHDMA_PerLine::         db
 HHDMA_NextTransfer::    db
 
 hCurBank::      db
+hSavedBank::    db
 hFraction::     db
 hLoopCnt::      db
 hLoopCnt2::     db

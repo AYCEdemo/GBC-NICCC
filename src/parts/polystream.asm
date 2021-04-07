@@ -104,20 +104,13 @@ polystream_findnextvert:    MACRO
     add $40
     ld h, a
     ld a, DIVTAB_BANK
-    ; turn off interrupts since VBlank relies on hCurBank to restore
-    ; the bank back and could potentially mess up the table lookup
-    di
+    ldh [hCurBank], a
     ld [MBC5RomBankLo], a
     ld e, [hl]
     inc a
+    ldh [hCurBank], a
     ld [MBC5RomBankLo], a
     ld d, [hl]
-    ldh a, [hCurBank]
-    ld [MBC5RomBankLo], a
-    ld hl, rIF
-    ; avoid HHDMA firing right after enabling interrupts and miss the timing
-    res IF_TIMER, [hl]
-    ei
 
     pop af ; sign
     jr nc, .positive\@
@@ -249,10 +242,12 @@ PolyStream::
     ei
 
     ld a, STREAM_BANK
-    ldh [hCurBank], a
-    ld [MBC5RomBankLo], a
+    ldh [hSavedBank], a
     ld hl, $4000
 PolyStream_Loop:
+    ldh a, [hSavedBank]
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
     ld a, [hl+]
     ld e, a
     xor a
@@ -270,6 +265,9 @@ PolyStream_Loop:
     ; fall through
 
 PolyStream_FaceLoop:
+    ldh a, [hSavedBank]
+    ldh [hCurBank], a
+    ld [MBC5RomBankLo], a
     ld a, [hl+]
     cp $fd ; end of stream?
     jp z, PolyStream_End
@@ -459,7 +457,7 @@ PolyStream_DoneBank:
     ld hl, hCurBank
     inc [hl]
     ld a, [hl]
-    ld [MBC5RomBankLo], a
+    ldh [hSavedBank], a
     ld hl, $4000
 
 PolyStream_DonePoly:
