@@ -497,7 +497,7 @@ PolyStream_End:
     ldh [c], a
     coord sp, 11, 1, PolyStream_TileMapDst
     ld hl, rSTAT
-    waitmode0
+    ; waitmode0 FIXME doesn't work on vblank
     ld hl, wInfoTilesBuf
     rept 7 / 2
     pop de
@@ -551,7 +551,7 @@ PolyStream_End:
     adc h
     ld hl, wInfoTilesBuf + 6
     ; a bit speedup
-    lb de, $fa, 10
+    lb de, $1a, 10
     ld a, [hl]
     adc c
     cp d ; 10
@@ -573,7 +573,7 @@ PolyStream_End:
     ld [hl-], a
     ld a, [hl] ; 10s
     inc a
-    cp $f6
+    cp $16
     jr c, .donenum
     sub 6
     ld [hl-], a
@@ -1026,7 +1026,7 @@ PolyStream_VBlankUpdate:
 .even
     ldh [rLCDC], a
 
-    ld c, 128
+    ld c, 120
     call HHDMA_Interrupt_VBlank
     ei
 
