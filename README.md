@@ -1,7 +1,7 @@
 # GBC-NICCC
 Yet another ST NICCC port for Game Boy Color first presented at Revision 2021
 
-## Dependancies
+## Dependencies
 * Python3
 * [rgbds](https://github.com/gbdev/rgbds)
 
