@@ -169,6 +169,15 @@ PolyStream::
     ld [wPalTabTemp+4], a
     ld [wPalTabTemp+5], a
 
+    ; Clear on-screen sprites so they don't shorten hblank
+    ld hl, $fe9f
+    xor a
+.clearspr
+    ld [hl], a
+    dec l
+    jr nz, .clearspr
+    ld [hl], a
+
     ; Clear tile $ff
     xor a
     ld hl, $8ff0
@@ -793,9 +802,8 @@ PolyStream_HHDMACallback:
     ld h, HIGH(sRenderBuf2)
 .bank0
     ld de, PolyStream_TileDataDst
-    ; transfers per line could be 8, but the real hardware doesn't
-    ; like GDMA on mode 2 for some reason, needs research
-    lb bc, 15*16+13, 5
+    ; transfers per line could be 8, but the window display also shortens hblank
+    lb bc, 15*16+13, 7
     call HHDMA_Transfer
     ld hl, wCurRender
     inc [hl]

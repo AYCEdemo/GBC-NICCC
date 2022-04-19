@@ -39,12 +39,11 @@ copycode:   MACRO
 waitmode0:  MACRO
     ; assuming hl already points to rSTAT
 ._\@0
-    ; let the current mode 0/2 finish
-    bit 0, [hl]
-    jr z, ._\@0
     ; make sure this is mode 3
-    bit 1, [hl]
-    jr z, ._\@0
+    ld a, [hl]
+    and 3
+    cp 3
+    jr nz, ._\@0
 ._\@1
     ; wait until mode 3 finish
     bit 0, [hl]

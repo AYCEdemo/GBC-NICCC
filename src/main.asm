@@ -143,25 +143,27 @@ BlackPalette::
     ldh [rOBPI], a
     ld c, LOW(rBGPD) ; a bit speedup
     ldh a, [rLCDC]
-    add a ; bit 7 -> carry
-    ld a, 0
-    jr nc, .lcdoff
+    and LCDC_ON
+    jr z, .lcdoff
 
     ld b, 4
     ld hl, rSTAT
 .lcdonLoop
     waitmode0
+    xor a ; 4
     rept 16
     ldh [c], a ; 8
     ldh [rOBPD], a ; 12
-    endr ; = 20 * 16 = 320, sprites safe
+    endr ; = 20 * 16 = 320
+        ; = 324, sprites safe
     dec b ; 4
     jr nz, .lcdonLoop ; 12
-        ; = 336
+        ; = 340
     ret
 
 .lcdoff
     ; regular fill, no need to wait for mode 0
+    xor a
     ld b, 64
 .lcdoffLoop
     ldh [c], a

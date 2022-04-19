@@ -36,12 +36,11 @@ HHDMA_Install::
     ldh [rIE], a
     ld a, %00100000 ; mode 2 interrupt
     ldh [rSTAT], a
-    ld hl, rIF
-    res IF_LCD_STAT, [hl] ; clear STAT interrupt flag so halt can exit
+    xor a
+    ldh [rIF], a ; clear all interrupt flags so halt can exit properly
     ; I want to put this code after halt but at the time of writing
     ; there's no way to force `ld [nn], a` without manually adding
     ; -L flag to the assembler
-    xor a
     ld [HHDMA_Status], a
     halt
     ld a, 17 ; 8

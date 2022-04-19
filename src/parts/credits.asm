@@ -526,7 +526,7 @@ Credits_DonePoly:
     ldh [rVBK], a
     ld hl, sRenderBuf
     ld de, Credits_TileDataDst
-    lb bc, 0, 5 ; 256, 8
+    lb bc, 0, 8 ; 256, 8
     call HHDMA_Transfer
     ld hl, CreditsTimerLast
     ld a, [CreditsTimer]
